@@ -1,0 +1,8 @@
+[meta]
+name      =  "TM Data Grabber"
+author    =  "Jeehoon"
+category  =  "AI"
+
+[script]
+dependencies = [ "VehicleState" ]
+timeout = 0
