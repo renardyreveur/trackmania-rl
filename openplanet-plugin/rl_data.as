@@ -20,12 +20,12 @@ namespace Data
 
         string EncodeJSON()
         {
-            return "{ \"checkpoint\":" + checkpoint + "," +
+            return "{\"checkpoint\":" + checkpoint + "," +
                     "\"front_speed\":" + front_speed + "," +
                     "\"distance\":" + distance + "," +
                     "\"duration\":" + duration + "," +
                     "\"race_finished\":" + race_finished + 
-                    "}";
+                    "}\n";
         }
 
     }
@@ -40,19 +40,15 @@ namespace Data
         // Using the Vehicle State Plugin Dependency
         auto visState = VehicleState::ViewingPlayerState();
 
+        // Check if we are playing the game (not in menu etc.)
+        if (playground is null || visState is null){
+            return "";
+        }
+
         // Game artifacts
         auto gameTerminal = playground.GameTerminals[0];
         auto arena = playground.Arena;
         auto player = cast<CSmPlayer>(arena.Players[0]).ScriptAPI;
-
-        // Check if we are playing the game (not in menu etc.)
-        if (playground is null || visState is null ||
-            !(gameTerminal.UISequence_Current == CGamePlaygroundUIConfig::EUISequence::Playing || 
-              gameTerminal.UISequence_Current == CGamePlaygroundUIConfig::EUISequence::Finish)){
-            return "";
-        }
-
-        // Get map landmarks (for checkpoint testing)
         MwFastBuffer<CGameScriptMapLandmark@> landmarks = arena.MapLandmarks;
 
         // Get current in-game time (for race record and duration)

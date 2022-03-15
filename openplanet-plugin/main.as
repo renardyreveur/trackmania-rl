@@ -15,6 +15,7 @@ bool WriteData(Net::Socket@ s, string jsonstring)
 	if (!s.WriteRaw(jsonstring))
 	{
 		print("Socket Write Failed!");
+		connected = false;
 		return false;
 	}
 	return true;
@@ -35,21 +36,22 @@ void Update(float dt)
 
 // Entrypoint
 void Main()
-{
-	// Initiate a socket to given address and port
-	if (!sock.Connect("127.0.0.1", 20222)){
-		print("Socket connection failed!");
-		return;
-	}
-
+{	
 	print("Connecting to Host...");
 
 	// Wait until socket is fully connected.
 	while (!sock.CanWrite()) {
+		// Initiate a socket to given address and port
+		if (!sock.Connect("127.0.0.1", 20222)){
+			print("Socket connection failed!");
+			return;
+		}
 		yield();
+
 	}
 
-	print("Connected!");
 	connected = true;
+	print("Connected!");
+	yield();
 
 }

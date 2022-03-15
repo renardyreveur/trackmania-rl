@@ -11,9 +11,10 @@ def start_sever(work_queue):
             while True:
                 data = self.request.recv(1024).strip()
                 if data is not None:
-                    data = data.decode("utf-8").split("\n")
-                    result = json.loads(data[0] if len(data) == 1 else data[-2])
-                    work_queue.put(result)
+                    data = [x for x in data.decode("utf-8").split("\n") if x.startswith("{\"") and x.endswith("e}")]
+                    if len(data) > 0:
+                        result = json.loads(data[-1])
+                        work_queue.put(result)
 
     with socketserver.TCPServer((HOST, PORT), TMDataGrabber) as server:
         print(f"Connected to {server.server_address}")
