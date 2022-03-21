@@ -1,7 +1,10 @@
 import queue
 import time
 
+import cv2
 import vgamepad as vg
+
+TEST = True
 
 # Loop Parameters
 stage = 1
@@ -32,7 +35,7 @@ def reset_game(gp):
 
 
 # Controller process
-def game(work_queue):
+def game(mque, ique):
     global stage, start, delta_distance, delta_counter
 
     # Virtual gamepad instance
@@ -44,6 +47,7 @@ def game(work_queue):
     time.sleep(0.5)
     gamepad.release_button(button=vg.DS4_BUTTONS.DS4_BUTTON_TRIANGLE)
     gamepad.update()
+
     print("HERE WE GO! Change focus to the TrackMania window")
     time.sleep(3)
 
@@ -54,9 +58,14 @@ def game(work_queue):
 
     # Main control loop
     while True:
+        if TEST and ique.length() == 20:
+            for fr in ique.get_frames():
+                cv2.imshow("TEST", fr)
+                cv2.waitKey(1)
+
         # Get metrics from Trackmania
         try:
-            result = work_queue.get_nowait()
+            result = mque.get_nowait()
         except queue.Empty:
             time.sleep(0.02)
             continue
@@ -68,20 +77,20 @@ def game(work_queue):
         gamepad.right_trigger_float(value_float=1)
         dur = time.time() - start
 
-        if 5.6 > dur > 4.3:
+        if 5.45 > dur > 4.15:
             # Turn right
             if stage == 2:
                 print("Turning Right!")
                 stage = 3
             gamepad.left_joystick_float(x_value_float=1, y_value_float=0.0)
-        elif 7.15 > dur >= 5.85:
+        elif 7.05 > dur >= 5.7:
             # Turn left, reduce speed for a bit
             if stage == 3:
                 print("Turning Left!")
                 stage = 4
             gamepad.right_trigger_float(value_float=max(1.8 * dur - 5*1.8, 1))
             gamepad.left_joystick_float(x_value_float=-1, y_value_float=0.0)
-        elif 8.55 > dur > 7.15:
+        elif 8.45 > dur > 7.05:
             # Turn right
             if stage == 4:
                 print("Turning Right!")
@@ -105,8 +114,8 @@ def game(work_queue):
         delta_distance = result['distance']
         gamepad.update()
 
-        # If vehicle stuck for more than 2000 units of continuous 'time', reset
-        if delta_counter > 2000:
+        # If vehicle stuck for more than 1500 units of continuous 'time', reset
+        if delta_counter > 1500:
             print("RESULT -- Going nowhere!\n")
             reset_game(gamepad)
 

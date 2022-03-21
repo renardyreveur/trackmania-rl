@@ -25,7 +25,8 @@ s.close()
 
 
 """
-Reward = Positive Speed, Negative Distance, Negative Time, Big positive Finish, Big positive Checkpoint
+Reward = Positive Speed, Negative Distance, Negative Time, Big positive Finish, Big positive Checkpoint, Negative on Impact
 
++ WR trajectory (best time)
 
 """
