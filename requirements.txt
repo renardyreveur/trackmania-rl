@@ -3,3 +3,4 @@ pillow
 pywin32
 numpy
 opencv-python
+jax[cpu]

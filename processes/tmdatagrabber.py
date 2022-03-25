@@ -1,11 +1,9 @@
-import socketserver
 import json
-
-HOST, PORT = "127.0.0.1", 20222
+import socketserver
 
 
 # TCP Socket Server Handler
-def start_sever(work_queue):
+def start_sever(work_queue, host, port):
     class TMDataGrabber(socketserver.BaseRequestHandler):
         def handle(self):
             while True:
@@ -16,6 +14,6 @@ def start_sever(work_queue):
                         result = json.loads(data[-1])
                         work_queue.put(result)
 
-    with socketserver.TCPServer((HOST, PORT), TMDataGrabber) as server:
+    with socketserver.TCPServer((host, port), TMDataGrabber) as server:
         print(f"Connected to {server.server_address}")
         server.serve_forever()
