@@ -78,6 +78,10 @@ def update_sgd(params, x, y, lr=0.01):
     return new_params
 
 
+def update_adamw(params, x, y,):
+    pass
+
+
 def progress(data_loader, b_idx):
     base = '[{}/{} ({:.0f}%)]'
     total = len(data_loader)

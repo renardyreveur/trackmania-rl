@@ -62,6 +62,7 @@ class RaceManager:
         return 0
 
     def collect_data(self):
+        # TODO: Implement Trajectory saving and Reward Calculation
         pass
 
 

@@ -7,7 +7,7 @@ from processes.screengetter import screen_getter
 from processes.tmdatagrabber import start_sever
 
 # Parameters
-POLICY = "rule_based_policy_test"
+POLICY = "neural_policy"
 
 TM_HOST, TM_PORT = "127.0.0.1", 20222
 

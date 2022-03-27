@@ -23,7 +23,7 @@ def game(met_que, img_que, policy_str):
 
         # Agent Action
         policy = getattr(policies, policy_str)
-        action = policy(gamepad, frames, start=rm.start_timer)
+        action = policy(frames, start=rm.start_timer)
         gamepad.right_trigger_float(value_float=random.gauss(action['rt_mu'], action['rt_sigma']))
         gamepad.left_trigger_float(value_float=random.gauss(action['lt_mu'], action['lt_sigma']))
         gamepad.left_joystick_float(x_value_float=random.gauss(action['ls_mu'], action['ls_sigma']), y_value_float=0.0)
