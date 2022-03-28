@@ -8,6 +8,8 @@ from processes.tmdatagrabber import start_sever
 
 # Parameters
 POLICY = "neural_policy"
+# POLICY = "rule_based_policy_test"
+
 
 TM_HOST, TM_PORT = "127.0.0.1", 20222
 

@@ -4,6 +4,10 @@ import jax.scipy as jscipy
 from jax import jit, random
 
 
+def get_params(params, idx):
+    return None if params is None else params[idx]
+
+
 def init_params(key, size):
     key, subkey = random.split(key)
     return key, random.normal(subkey, shape=size)

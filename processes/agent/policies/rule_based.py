@@ -2,14 +2,14 @@ import time
 
 
 # Trackmania Tutorial Track 1
-def rule_based_policy_test(frames, **kwargs):
+def rule_based_policy_test(start, **kwargs):
     # Base action : Accelerate
     action = {
         "rt_mu": 1, "lt_mu": 0, "ls_mu": 0,
         "rt_sigma": 0, "lt_sigma": 0, "ls_sigma": 0
     }
 
-    dur = time.time() - kwargs['start']
+    dur = time.time() - start
     if 5.3 > dur > 4.0:
         action['ls_mu'] = 1   # Turn right
 

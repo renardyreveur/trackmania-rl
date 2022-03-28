@@ -1,18 +1,16 @@
 import os
-
 os.add_dll_directory("C:/Program Files/NVIDIA GPU Computing Toolkit/CUDA/v11.6/bin")
 os.add_dll_directory("C:/Program Files/NVIDIA/CUDNN/v8.3/bin")
 
 import numpy as np
 
 import jax.numpy as jnp
+from jax import jit
 
-from processes.agent.policies.neural_agent.act_layers import conv2d, linear, layer_norm, gelu
-from processes.agent.policies.neural_agent.attention import attention
+from functools import partial
 
-
-def get_params(params, idx):
-    return None if params is None else params[idx]
+from training.model.act_layers import conv2d, linear, layer_norm, gelu, get_params
+from training.model.attention import attention
 
 
 def downsample(in_x, in_dim, out_dim, params=None):
@@ -49,11 +47,12 @@ def frame_feature_extractor(in_x, dims, params=None):
             x, p3 = downsample(x, in_dim=dims[i], out_dim=dims[i + 1], params=get_params(params, 3 + i * 2))
             new_params.append(p3)
 
-    features, p9 = layer_norm(jnp.mean(x, axis=(-2, -1)), dim=1, params=get_params(params, 9))
+    features, p9 = layer_norm(jnp.mean(x, axis=(-2, -1)), dim=1, params=get_params(params, len(dims)*2+1))
     new_params.append(p9)
     return features, new_params
 
 
+@partial(jit, static_argnums=(1, 2,))
 def neural_model(in_x, feat_dims, heads, params=None):
     feature_seq = []
     new_params = []
@@ -61,7 +60,7 @@ def neural_model(in_x, feat_dims, heads, params=None):
         x, p0 = frame_feature_extractor(jnp.expand_dims(in_x[:, frame_num, :, :], 1), dims=feat_dims,
                                         params=get_params(params, 0))
         feature_seq.append(x)
-        new_params.append(p0)
+    new_params.append(p0)
 
     feature_seq = jnp.stack(feature_seq, axis=1)
 
@@ -100,15 +99,14 @@ def neural_model(in_x, feat_dims, heads, params=None):
     return output, new_params
 
 
-def neural_policy(frames, **kwargs):
+def neural_policy(frames, params, **kwargs):
     frames = jnp.asarray(np.concatenate(frames, 1))
-    output, _ = neural_model(frames, feat_dims=[16, 64, 128], heads=2, params=None)
+    output, _ = neural_model(frames, (16, 64, 128), 2, params=params)
     mu = output[0][0]
     std = output[0][1]
 
     action = {
-        "rt_mu": mu[0], "lt_mu": mu[1], "ls_mu": mu[2],
-        "rt_sigma": std[0], "lt_sigma": std[1], "ls_sigma": std[2]
+        "rt_mu": mu[0].item(), "lt_mu": mu[1].item(), "ls_mu": mu[2].item(),
+        "rt_sigma": std[0].item(), "lt_sigma": std[1].item(), "ls_sigma": std[2].item()
     }
-    print(action)
     return action
