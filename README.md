@@ -5,7 +5,9 @@
 ** Change this to a cool gif :rofl: **
 
 
-## Introduction
+## Introduction (YATAI - Yet Another Trackmania AI project)
+
+(TIL - apparently 'yatai' means food cart in Japanese)
 
 I pondered what would be the best way to enter the reinforcement learning world, and arrived at the conclusion to be an `agent` myself in the `environment of learning`, making observations, refining my actions, and seeking greater rewards(which is world domination, no I'm joking, knowledge and appreciation of all the great works being produced.)
 
