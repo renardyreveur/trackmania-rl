@@ -78,6 +78,12 @@ The `main.py` script does three things
 > 
 >It will say `Socket Write Failed!`. Try reloading the plugin if that is the case.
 
+Once `main.py` is on a roll, you'll see this on your terminal:
+
+![press_g](res/press_g.png)
+
+That is your cue to let the magic happen! Press that `g` key and see ~~a ghost driving your car into walls~~ your agent do its thang!
+
 <br/><br/>
 
 ### Training Data Accumulation
