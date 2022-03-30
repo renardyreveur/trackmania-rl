@@ -2,3 +2,12 @@
 venv
 __pycache__
 MNIST
+
+# Wheel files
+*.whl
+
+# Weight files
+*.weights
+
+# Trajectory files
+*.traj
