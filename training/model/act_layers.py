@@ -14,6 +14,13 @@ def init_params(key, size):
 
 
 @jit
+def sigmoid(x):
+    return jnp.where(x >= 0,
+                    1 / (1 + jnp.exp(-x)),
+                    jnp.exp(x) / (1 + jnp.exp(x)))
+
+
+@jit
 def hard_swish(in_x):
     return in_x * jnp.maximum(0, in_x + 3) / 6
 

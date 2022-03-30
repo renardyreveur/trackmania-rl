@@ -21,3 +21,56 @@ def batch_cross_entropy(params, model, x, y):
     preds, params = model(x, params)
     loss_fn = vmap(cross_entropy)
     return jnp.mean(loss_fn(preds, y))
+
+
+# soft Q-function target
+def soft_q_loss(parameters, models, feat_dims, trajectory_iteration, decay=0.99, entropy_temp=0.2):
+    neural_model, q_func = models
+    q_dims, p_dims = feat_dims
+    q1_p, q2_p, pi_p, q1_t_p, q2_t_p = parameters
+
+    s_0, a_0 = trajectory_iteration[0], trajectory_iteration[1]
+    reward, s_1 = trajectory_iteration[2], trajectory_iteration[3]
+
+    # Calculate Q values for the given state and action pair
+    q_val1 = q_func(s_0, a_0, feat_dims=q_dims, params=q1_p)
+    q_val2 = q_func(s_0, a_0, feat_dims=q_dims, params=q2_p)
+
+    # --- Soft Q function target ---
+    # Sample action from 'current' policy with s_{t+1}
+    (a_1, logpi_a_1), _ = neural_model(s_1, feat_dims=p_dims, params=pi_p)
+
+    # Q values Target
+    q_val1_t = q_func(s_1, a_1, feat_dims=q_dims, params=q1_t_p)
+    q_val2_t = q_func(s_1, a_1, feat_dims=q_dims, params=q2_t_p)
+    q_val_t = jnp.min(q_val1_t, q_val2_t)
+    q_target = reward + decay * (q_val_t - entropy_temp * logpi_a_1)
+
+    # MSE Loss against Bellman backup
+    loss_q1 = jnp.mean((q_val1 - q_target)**2)
+    loss_q2 = jnp.mean((q_val2 - q_target)**2)
+    loss_q = loss_q1 + loss_q2
+
+    return loss_q
+
+
+# Policy Loss
+def policy_loss(parameters, models, feat_dims, trajectory_iteration, entropy_temp=0.2):
+    neural_model, q_func = models
+    q_dims, p_dims = feat_dims
+    pi_p, q1_p, q2_p = parameters
+
+    s_0 = trajectory_iteration[0]
+
+    # Sample action from current time
+    (a_0, logprob_a_0), _ = neural_model(s_0, feat_dims=p_dims, params=pi_p)
+
+    # Get Q value of sampled action
+    q1_val = q_func(s_0, a_0, feat_dims=q_dims, params=q1_p)
+    q2_val = q_func(s_0, a_0, feat_dims=q_dims, params=q2_p)
+    q_val = jnp.min(q1_val, q2_val)
+
+    # Minimize expected KL-divergence
+    loss_pi = jnp.mean(entropy_temp * logprob_a_0 - q_val)
+
+    return loss_pi

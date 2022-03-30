@@ -1,6 +1,6 @@
 import jax.numpy as jnp
 from jax import random
-from processes.agent.policies.neural_agent.act_layers import softmax
+from act_layers import softmax
 
 
 def attention(in_x, dim, keys=None, values=None, seed=0, params=None):

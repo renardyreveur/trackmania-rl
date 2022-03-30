@@ -1,16 +1,19 @@
 import os
-os.add_dll_directory("C:/Program Files/NVIDIA GPU Computing Toolkit/CUDA/v11.6/bin")
-os.add_dll_directory("C:/Program Files/NVIDIA/CUDNN/v8.3/bin")
-
-import numpy as np
+from functools import partial
+if os.name == 'nt':
+    os.add_dll_directory("C:/Program Files/NVIDIA GPU Computing Toolkit/CUDA/v11.6/bin")
+    os.add_dll_directory("C:/Program Files/NVIDIA/CUDNN/v8.3/bin")
 
 import jax.numpy as jnp
+import jax.random as jrandom
 from jax import jit
 
-from functools import partial
+from act_layers import conv2d, linear, layer_norm, gelu, get_params
+from attention import attention
 
-from training.model.act_layers import conv2d, linear, layer_norm, gelu, get_params
-from training.model.attention import attention
+from tensorflow_probability.substrates import jax as tfp
+tfd = tfp.distributions
+tfb = tfp.bijectors
 
 
 def downsample(in_x, in_dim, out_dim, params=None):
@@ -35,7 +38,7 @@ def convnext_block(in_x, dim, params=None):
 def frame_feature_extractor(in_x, dims, params=None):
     new_params = []
     # Stem
-    x, p0 = conv2d(in_x, 1, 16, kernel_size=(4, 4), stride=(4, 4), params=get_params(params, 0))
+    x, p0 = conv2d(in_x, 1, dims[0], kernel_size=(4, 4), stride=(4, 4), params=get_params(params, 0))
     x, p1 = layer_norm(x, 1, get_params(params, 1))
     new_params.append(p0)
     new_params.append(p1)
@@ -53,7 +56,7 @@ def frame_feature_extractor(in_x, dims, params=None):
 
 
 @partial(jit, static_argnums=(1, 2,))
-def neural_model(in_x, feat_dims, heads, params=None):
+def neural_model(in_x, feat_dims, heads=2, seed=42, deterministic=False, params=None):
     feature_seq = []
     new_params = []
     for frame_num in range(in_x.shape[1]):
@@ -96,17 +99,18 @@ def neural_model(in_x, feat_dims, heads, params=None):
         new_params.append(p5)
         new_params.append(p6)
 
-    return output, new_params
+    # Get action distribution, sample, and log probs using tensorflow-probability
+    action_samples, action_logprobs = [], []
+    for mu, std, dist_trans in zip(*output, [tfb.Sigmoid(), tfb.Sigmoid(), tfb.Tanh()]):
+        if deterministic:
+            std = 0
+        dist = tfd.TransformedDistribution(
+            tfd.Normal(mu, std),
+            dist_trans
+        )
+        sample = dist.sample(seed=jrandom.PRNGKey(seed))
+        logprob = dist.log_prob(sample)
+        action_samples.append(sample)
+        action_logprobs.append(logprob)
 
-
-def neural_policy(frames, params, **kwargs):
-    frames = jnp.asarray(np.concatenate(frames, 1))
-    output, _ = neural_model(frames, (16, 64, 128), 2, params=params)
-    mu = output[0][0]
-    std = output[0][1]
-
-    action = {
-        "rt_mu": mu[0].item(), "lt_mu": mu[1].item(), "ls_mu": mu[2].item(),
-        "rt_sigma": std[0].item(), "lt_sigma": std[1].item(), "ls_sigma": std[2].item()
-    }
-    return action
+    return (action_samples, action_logprobs), new_params

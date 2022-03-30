@@ -33,9 +33,9 @@ def adamw(w, g, lr=0.001, betas=(0.9, 0.999), eps=1e-08, weight_decay=0.001, op_
 
 
 @jit
-def update(loss_fn, model, params, x, y, optimizer, optimizer_params):
+def update(loss_fn, model, params, optimizer, optimizer_params, **kwargs):
     # Calculate gradients of loss w.r.t params
-    gradient = grad(loss_fn, argnums=0)(params, model, x, y)
+    gradient = grad(loss_fn, argnums=0)(params, model, **kwargs)
 
     # Step counter in optimizer_params update
     [[v.update({"step": v['step'] + 1}) for k, v in ly.items()] for ly in optimizer_params]

@@ -1,3 +1,4 @@
+import pickle
 from multiprocessing import Process, Queue
 from multiprocessing.managers import BaseManager
 
@@ -9,7 +10,9 @@ from processes.tmdatagrabber import start_sever
 # Parameters
 POLICY = "neural_policy"
 # POLICY = "rule_based_policy_test"
-
+PARAMS = "sample_model.weights"
+with open(PARAMS, 'rb') as f:
+    params = pickle.load(f)
 
 TM_HOST, TM_PORT = "127.0.0.1", 20222
 
@@ -29,7 +32,7 @@ if __name__ == "__main__":
     image_queue = manager.FrameList(max_len=SCREENSHOT_MAXLEN)
 
     # Controller Process (Consumer), Socket Server Process (Producer), Screenshot Taking Process (Producer)
-    p1 = Process(target=game, args=(metric_queue, image_queue, POLICY))
+    p1 = Process(target=game, args=(metric_queue, image_queue, POLICY, params))
     p2 = Process(target=start_sever, args=(metric_queue, TM_HOST, TM_PORT))
     p3 = Process(target=screen_getter, args=(image_queue, SCREENSHOT_FRAMERATE))
     processes = [p1, p2, p3]

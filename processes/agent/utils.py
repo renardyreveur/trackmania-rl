@@ -3,6 +3,7 @@ import queue
 
 import vgamepad as vg
 import win32api as wapi
+import pickle
 
 
 class RaceManager:
@@ -18,6 +19,11 @@ class RaceManager:
 
         # Observations
         self.metrics, self.frames = None, None
+
+        # History
+        self.trajectory = []
+        self.num_trajectory = 0
+        self.state_history, self.act_history = None, None
 
     def reset(self):
         self.delta_counter, self.delta_distance = 0, 0
@@ -61,9 +67,35 @@ class RaceManager:
 
         return 0
 
-    def collect_data(self):
-        # TODO: Implement Trajectory saving and Reward Calculation
-        pass
+    def update_history(self, state, action):
+        self.state_history = state
+        self.act_history = action
+
+    def collect_data(self, state):
+        # Initial state
+        if self.state_history is None or self.act_history is None:
+            return -1
+
+        # Reward Calculation
+        metrics = [self.metrics['distance'],
+                   self.metrics['front_speed'],
+                   self.metrics['checkpoint'],
+                   self.metrics['duration']]
+        weights = [-0.01, 0.2, 1000, -1]
+        reward = sum([weights[i] * metrics[i] for i in range(len(metrics))])
+
+        # Race finish gives the ultimate reward
+        if state == -2:
+            reward += 10000
+
+        self.trajectory.append((self.state_history, self.act_history, reward, self.frames))
+
+        # If a run is completed, reset replay buffer and save (as s_t and s_{t+1} won't match)
+        if state != 0:
+            with open(f"training/data/t_{self.num_trajectory}.traj", 'wb') as f:
+                pickle.dump(self.trajectory, f)
+            self.trajectory = []
+            self.num_trajectory += 1
 
 
 def init_game():
