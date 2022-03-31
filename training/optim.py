@@ -2,17 +2,25 @@ import jax.numpy as jnp
 from jax import grad, jit
 
 
+def init_optim_params(params, value):
+    params = [init_optim_params(x, value) if isinstance(x, list) else {k: value for k, v in x.items()}
+              for x in params]
+    return params
+
+
 # SGD
 def sgd(w, g, lr=0.001, op_params=None, **kwargs):
     if op_params is None:
-        return [{k: {"step": 0} for k, v in layer.items()} for layer in w]
+        return init_optim_params(w, {"step": 0})
+        # return [{k: {"step": 0} for k, v in layer.items()} for layer in w]
     return w - lr * g, op_params
 
 
 # Adam with weight decay
 def adamw(w, g, lr=0.001, betas=(0.9, 0.999), eps=1e-08, weight_decay=0.001, op_params=None, **kwargs):
     if op_params is None:
-        return [{k: {"m0": 0, "v0": 0, "step": 0} for k, v in layer.items()} for layer in w]
+        return init_optim_params(w, {"m0": 0, "v0": 0, "step": 0})
+        # return [{k: {"m0": 0, "v0": 0, "step": 0} for k, v in layer.items()} for layer in w]
 
     # Momentum
     # Gradient direction is smoothed by exponentially weighing the moving averages
@@ -36,9 +44,13 @@ def adamw(w, g, lr=0.001, betas=(0.9, 0.999), eps=1e-08, weight_decay=0.001, op_
 def update(loss_fn, model, params, optimizer, optimizer_params, **kwargs):
     # Calculate gradients of loss w.r.t params
     gradient = grad(loss_fn, argnums=0)(params, model, **kwargs)
-
+    print(len(gradient))
     # Step counter in optimizer_params update
-    [[v.update({"step": v['step'] + 1}) for k, v in ly.items()] for ly in optimizer_params]
+    if isinstance(optimizer_params[0], list):
+        for i in range(len(optimizer_params)):
+            [[v.update({"step": v['step'] + 1}) for k, v in ly.items()] for ly in optimizer_params[i]]
+    else:
+        [[v.update({"step": v['step'] + 1}) for k, v in ly.items()] for ly in optimizer_params]
 
     # Get updated parameters
     new_params, new_oparams = [], []

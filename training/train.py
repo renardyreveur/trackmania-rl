@@ -13,7 +13,7 @@ from loss import soft_q_loss, policy_loss
 from model.act_layers import init_params
 from model.policy_model import neural_model
 from model.q_function import q_func
-from utils import progress
+from utils import progress, parameter_count
 
 # TRAIN PARAMETERS
 EPOCH = 10
@@ -25,22 +25,24 @@ T_SMOOTH = 0.005
 k = jrandom.PRNGKey(123)
 
 # Two soft Q-functions
+print("** Creating Q Functions ...")
 k, qs_dummy = init_params(k, size=(1, 5, 480, 320))
 k, qa_dummy = init_params(k, size=(1, 6))
 _, q1_params = q_func(qs_dummy, qa_dummy, feat_dims=Q_FEAT_DIMS)
 _, q2_params = q_func(qs_dummy, qa_dummy, feat_dims=Q_FEAT_DIMS)
-q_num_params = sum([sum([jnp.prod(jnp.asarray(v.shape)) for _, v in p.items()]) for p in q1_params])
-print(f"Each Q-Value function has {q_num_params} parameters!")
+q_num_params = parameter_count(q1_params)
+print(f"Each Q-Value function has {q_num_params} parameters! \n")
 
 # Exponentially moving average of soft Q-function weights (used in soft-q function target calculation)
 q1_expmov_params = q1_params.copy()
 q2_expmov_params = q2_params.copy()
 
 # Policy network
+print("** Creating Policy network ...")
 k, pi_dummy = init_params(k, size=(1, 5, 480, 320))
 _, pi_params = neural_model(pi_dummy, feat_dims=PI_FEAT_DIMS)
-pi_num_params = sum([sum([jnp.prod(jnp.asarray(v.shape)) for _, v in p.items()]) for p in pi_params])
-print(f"The Policy network has {pi_num_params} parameters!")
+pi_num_params = parameter_count(pi_params)
+print(f"The Policy network has {pi_num_params} parameters!\n")
 
 # Set Optimizer
 OPTIM = "adamw"
@@ -64,7 +66,7 @@ for epoch in range(EPOCH):
         # TODO:  This will break, change update function such that it handles tuples of inputs too
         q_loss, (q1_params, q2_params), (q1_optimizer_params, q2_optimizer_params) = optim.update(
             jax.tree_util.Partial(soft_q_loss),
-            (jax.tree_util.Partial(neural_model).jax.tree_util.Partial(q_func)),
+            (jax.tree_util.Partial(neural_model), jax.tree_util.Partial(q_func)),
             (q1_params, q2_params, pi_params, q1_expmov_params, q2_expmov_params),
             jax.tree_util.Partial(q_optimizer),
             (q1_optimizer_params, q2_optimizer_params),
@@ -77,7 +79,7 @@ for epoch in range(EPOCH):
         # Gradient Descent on policy network
         pi_loss, pi_params, pi_optimizer_params = optim.update(
             jax.tree_util.Partial(policy_loss),
-            (jax.tree_util.Partial(neural_model).jax.tree_util.Partial(q_func)),
+            (jax.tree_util.Partial(neural_model), jax.tree_util.Partial(q_func)),
             (pi_params, q1_params, q2_params),
             jax.tree_util.Partial(pi_optimizer),
             pi_optimizer_params,

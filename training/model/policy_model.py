@@ -1,17 +1,13 @@
-import os
 from functools import partial
-if os.name == 'nt':
-    os.add_dll_directory("C:/Program Files/NVIDIA GPU Computing Toolkit/CUDA/v11.6/bin")
-    os.add_dll_directory("C:/Program Files/NVIDIA/CUDNN/v8.3/bin")
 
 import jax.numpy as jnp
 import jax.random as jrandom
 from jax import jit, vmap
+from tensorflow_probability.substrates import jax as tfp
 
 from .act_layers import conv2d, linear, layer_norm, gelu, get_params
 from .attention import attention
 
-from tensorflow_probability.substrates import jax as tfp
 tfd = tfp.distributions
 tfb = tfp.bijectors
 

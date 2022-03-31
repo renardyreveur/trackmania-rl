@@ -1,9 +1,6 @@
 import os
 import pickle
 import random
-if os.name == 'nt':
-    os.add_dll_directory("C:/Program Files/NVIDIA GPU Computing Toolkit/CUDA/v11.6/bin")
-    os.add_dll_directory("C:/Program Files/NVIDIA/CUDNN/v8.3/bin")
 
 import jax.numpy as jnp
 

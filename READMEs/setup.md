@@ -24,9 +24,10 @@
   - When importing the jax module, Python on Windows might have a problem looking for the CUDA and cuDNN dlls. As a workaround, add these lines(change accordingly) before importing jax
   
   ```python
-  import os
-  os.add_dll_directory("C:/Program Files/NVIDIA GPU Computing Toolkit/CUDA/v11.6/bin")
-  os.add_dll_directory("C:/Program Files/NVIDIA/CUDNN/v8.3/bin")
+  import os 
+  if os.name == 'nt':
+      os.add_dll_directory("C:/Program Files/NVIDIA GPU Computing Toolkit/CUDA/<CUDA_VERSION>/bin")
+      os.add_dll_directory("C:/Program Files/NVIDIA/CUDNN/<cuDNN VERSION>/bin")
   ```
  
  
