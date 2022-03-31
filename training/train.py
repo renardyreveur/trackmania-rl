@@ -45,6 +45,7 @@ pi_num_params = parameter_count(pi_params)
 print(f"The Policy network has {pi_num_params} parameters!\n")
 
 # Set Optimizer
+print("** Defining Optimizers to update the networks ...")
 OPTIM = "adamw"
 q_optimizer = getattr(optim, OPTIM)
 pi_optimizer = getattr(optim, OPTIM)
@@ -52,12 +53,16 @@ pi_optimizer = getattr(optim, OPTIM)
 q1_optimizer_params = q_optimizer(q1_params, None)
 q2_optimizer_params = q_optimizer(q2_params, None)
 pi_optimizer_params = pi_optimizer(pi_params, None)
+print("Done!\n")
 
 # Get Dataloader
+print("Loading Dataset and creating DataLoader ...")
 dataset = TrajectoryDataset("data")
 dataloader = TrajectoryLoader(dataset, 20)
+print(f"There are {len(dataset)} samples, and one epoch with a batch size of {20} has {len(dataset)//20} batches!\n")
 
 # Training loop
+print("Start Training!\n")
 for epoch in range(EPOCH):
     print("\n")
     start = time.time()

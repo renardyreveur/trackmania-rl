@@ -27,6 +27,11 @@ class TrajectoryDataset:
         a_0 = self.trajectories[idx][1]
         reward = jnp.expand_dims(jnp.array([self.trajectories[idx][2]]), 0)
         s_1 = self.trajectories[idx][3]
+        print(type(s_0), len(s_0))
+        print(type(a_0), len(a_0))
+        print(type(reward), len(reward))
+        print(type(s_1), len(s_1))
+
         return jnp.concatenate(s_0, axis=1), jnp.expand_dims(jnp.asarray(list(a_0.values())), 0), reward, jnp.concatenate(s_1, axis=1)
 
 

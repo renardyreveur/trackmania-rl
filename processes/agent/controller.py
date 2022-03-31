@@ -21,10 +21,10 @@ def game(met_que, img_que, policy_str, params=None):
 
         # Agent Action
         policy = getattr(policies, policy_str)
-        action = policy(frames=frames, start=rm.start_timer, params=params)
-        gamepad.right_trigger_float(value_float=action['rt'])
-        gamepad.left_trigger_float(value_float=action['lt'])
-        gamepad.left_joystick_float(x_value_float=action['ls'], y_value_float=0.0)
+        sub_action, action = policy(frames=frames, start=rm.start_timer, params=params)
+        gamepad.right_trigger_float(value_float=sub_action['rt'])
+        gamepad.left_trigger_float(value_float=sub_action['lt'])
+        gamepad.left_joystick_float(x_value_float=sub_action['ls'], y_value_float=0.0)
         gamepad.update()
 
         # Check race state, and collect data for training

@@ -4,7 +4,7 @@
 
 - **TrackMania**(2020)
   - Download from Ubisoft or Epic Games store
-  - You don't need the Standard or Club editions unless you want to further customize the plugin script
+  - You don't need the Standard or Club editions unless you want to further customize the plugin script (Note to self, for this, ask Melissa to sign the plugin please)
 
 
 - **Openplanet**

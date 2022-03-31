@@ -12,7 +12,6 @@ def init_optim_params(params, value):
 def sgd(w, g, lr=0.001, op_params=None, **kwargs):
     if op_params is None:
         return init_optim_params(w, {"step": 0})
-        # return [{k: {"step": 0} for k, v in layer.items()} for layer in w]
     return w - lr * g, op_params
 
 

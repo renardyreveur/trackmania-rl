@@ -20,4 +20,4 @@ def rule_based_policy_test(start, **kwargs):
     else:
         action['ls'] = 0   # Straight ahead!
 
-    return action
+    return action, action
