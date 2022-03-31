@@ -16,8 +16,8 @@ def init_params(key, size):
 @jit
 def sigmoid(x):
     return jnp.where(x >= 0,
-                    1 / (1 + jnp.exp(-x)),
-                    jnp.exp(x) / (1 + jnp.exp(x)))
+                     1 / (1 + jnp.exp(-x)),
+                     jnp.exp(x) / (1 + jnp.exp(x)))
 
 
 @jit
@@ -67,7 +67,8 @@ def linear(in_x, proj_dim, bias=True, seed=0, params=None):
     return in_x @ params['weight'] + (params['bias'] if bias else 0), params
 
 
-def conv2d(in_x, in_chns, out_chns, kernel_size, padding="VALID", groups=1, stride=None, bias=False, seed=0, params=None):
+def conv2d(in_x, in_chns, out_chns, kernel_size, padding="VALID", groups=1, stride=None, bias=False,
+           seed=0, params=None):
     if stride is None:
         stride = (1,) * (in_x.ndim - 2)
     if params is None:

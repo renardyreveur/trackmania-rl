@@ -13,6 +13,7 @@ POLICY = "neural_policy"
 PARAMS = "sample_model.weights"
 with open(PARAMS, 'rb') as f:
     params = pickle.load(f)
+params=None
 
 TM_HOST, TM_PORT = "127.0.0.1", 20222
 

@@ -6,10 +6,10 @@ if os.name == 'nt':
 
 import jax.numpy as jnp
 import jax.random as jrandom
-from jax import jit
+from jax import jit, vmap
 
-from act_layers import conv2d, linear, layer_norm, gelu, get_params
-from attention import attention
+from .act_layers import conv2d, linear, layer_norm, gelu, get_params
+from .attention import attention
 
 from tensorflow_probability.substrates import jax as tfp
 tfd = tfp.distributions
@@ -18,18 +18,19 @@ tfb = tfp.bijectors
 
 def downsample(in_x, in_dim, out_dim, params=None):
     x, p0 = layer_norm(in_x, 1, get_params(params, 0))
-    x, p1 = conv2d(x, in_dim, out_dim, kernel_size=(2, 2), stride=(2, 2), params=get_params(params, 1))
+    x, p1 = conv2d(x, in_dim, out_dim, kernel_size=(2, 2), stride=(2, 2),
+                   seed=abs((jnp.ravel(x)[-1]+1)*in_dim*out_dim).astype(int), params=get_params(params, 1))
     return x, [p0, p1]
 
 
 def convnext_block(in_x, dim, params=None):
     x, p0 = conv2d(in_x, dim, dim, kernel_size=(7, 7), padding=((3, 3), (3, 3)), groups=dim,
-                   params=get_params(params, 0))
+                   seed=abs(((jnp.ravel(in_x)[-1]+1)*dim).astype(int)), params=get_params(params, 0))
     x = jnp.transpose(x, (0, 2, 3, 1))
     x, p1 = layer_norm(x, 3, get_params(params, 1))
-    x, p2 = linear(x, dim * 2, get_params(params, 2))
+    x, p2 = linear(x, dim * 2, seed=abs(((jnp.ravel(x)[-1]+1)*dim*2).astype(int)), params=get_params(params, 2))
     x = gelu(x)
-    x, p3 = linear(x, dim, get_params(params, 3))
+    x, p3 = linear(x, dim, seed=abs(((jnp.ravel(x)[-1]+1)*dim).astype(int)), params=get_params(params, 3))
     x = jnp.transpose(x, (0, 3, 1, 2))
     # TODO: Add DropPath
     return x, [p0, p1, p2, p3]
@@ -38,7 +39,8 @@ def convnext_block(in_x, dim, params=None):
 def frame_feature_extractor(in_x, dims, params=None):
     new_params = []
     # Stem
-    x, p0 = conv2d(in_x, 1, dims[0], kernel_size=(4, 4), stride=(4, 4), params=get_params(params, 0))
+    x, p0 = conv2d(in_x, 1, dims[0], kernel_size=(4, 4), stride=(4, 4),
+                   seed=abs(((jnp.ravel(in_x)[-1]+1)*dims[0]).astype(int)), params=get_params(params, 0))
     x, p1 = layer_norm(x, 1, get_params(params, 1))
     new_params.append(p0)
     new_params.append(p1)
@@ -55,8 +57,27 @@ def frame_feature_extractor(in_x, dims, params=None):
     return features, new_params
 
 
+def sample_action(mu, std, dist_trans, seed, deterministic=False):
+    action_samples = []
+    action_logprobs = []
+    for m, s, dt, sd in zip(mu, std, dist_trans, seed):
+        if deterministic:
+            s = 0
+        dist = tfd.TransformedDistribution(
+            tfd.Normal(m, s),
+            dt
+        )
+        sample = dist.sample(seed=jrandom.PRNGKey(sd))
+        action_samples.append(sample)
+        action_logprobs.append(dist.log_prob(sample))
+    return action_samples, action_logprobs
+
+
+batch_sample_action = vmap(sample_action, in_axes=(0, 0, None, None, None))
+
+
 @partial(jit, static_argnums=(1, 2,))
-def neural_model(in_x, feat_dims, heads=2, seed=42, deterministic=False, params=None):
+def neural_model(in_x, feat_dims, heads=2, deterministic=False, params=None):
     feature_seq = []
     new_params = []
     for frame_num in range(in_x.shape[1]):
@@ -70,14 +91,16 @@ def neural_model(in_x, feat_dims, heads=2, seed=42, deterministic=False, params=
     # Multi-head attention, concat results
     attn_heads = []
     for i in range(heads):
-        a_out, p1 = attention(feature_seq, dim=feat_dims[-1], params=get_params(params, i + 1))
+        a_out, p1 = attention(feature_seq, dim=feat_dims[-1],
+                              seed=abs(((jnp.ravel(feature_seq)[-1]+1)*(i+3)).astype(int)), params=get_params(params, i + 1))
         attn_heads.append(a_out)
         new_params.append(p1)
 
     mh_out = jnp.concatenate(attn_heads, axis=-1)
 
     # Residual skip-connection and layer norm
-    reproj, p2 = linear(mh_out, feat_dims[-1], params=get_params(params, heads + 1))
+    reproj, p2 = linear(mh_out, feat_dims[-1],
+                        seed=abs(((jnp.ravel(mh_out)[-1]+1)*feat_dims[-1]).astype(int)), params=get_params(params, heads + 1))
     new_params.append(p2)
     reproj = gelu(reproj + feature_seq)
     nmres, p3 = layer_norm(reproj, dim=2, params=get_params(params, heads + 2))
@@ -89,28 +112,26 @@ def neural_model(in_x, feat_dims, heads=2, seed=42, deterministic=False, params=
     # Output projection (2 branches)
     output = []
     for i, _ in enumerate(['mean', 'std']):
-        mustd, p4 = linear(nmres, feat_dims[-1], params=get_params(params, heads + 3 + i * 3))
+        mustd, p4 = linear(nmres, feat_dims[-1],
+                           seed=abs(((jnp.ravel(nmres)[-1]+1)*(i+2)).astype(int)), params=get_params(params, heads + 3 + i * 3))
         mustd = gelu(mustd)
-        mustd, p5 = linear(mustd, feat_dims[-1] // 2, params=get_params(params, heads + 4 + i * 3))
+        mustd, p5 = linear(mustd, feat_dims[-1] // 2,
+                           seed=abs(((jnp.ravel(mustd)[-1]+1)*(i+2)).astype(int)), params=get_params(params, heads + 4 + i * 3))
         mustd = gelu(mustd)
-        mustd, p6 = linear(mustd, 3, params=get_params(params, heads + 5 + i * 3))
+        mustd, p6 = linear(mustd, 3,
+                           seed=abs(((jnp.ravel(mustd)[-1]+1)*(i+2)).astype(int)), params=get_params(params, heads + 5 + i * 3))
         output.append(mustd)
         new_params.append(p4)
         new_params.append(p5)
         new_params.append(p6)
 
     # Get action distribution, sample, and log probs using tensorflow-probability
-    action_samples, action_logprobs = [], []
-    for mu, std, dist_trans in zip(*output, [tfb.Sigmoid(), tfb.Sigmoid(), tfb.Tanh()]):
-        if deterministic:
-            std = 0
-        dist = tfd.TransformedDistribution(
-            tfd.Normal(mu, std),
-            dist_trans
-        )
-        sample = dist.sample(seed=jrandom.PRNGKey(seed))
-        logprob = dist.log_prob(sample)
-        action_samples.append(sample)
-        action_logprobs.append(logprob)
+    dist_t = [tfb.Sigmoid(), tfb.Sigmoid(), tfb.Tanh()]
+    sample_seeds = [
+        abs(((jnp.ravel(output[0])[-1] + 1) * 1).astype(int)),
+        abs(((jnp.ravel(output[0])[-1] + 1) * 2).astype(int)),
+        abs(((jnp.ravel(output[0])[-1] + 1) * 3).astype(int))
+    ]
+    act_samples, act_logprobs = batch_sample_action(output[0], jnp.exp(output[1]), dist_t, sample_seeds, deterministic)
 
-    return (action_samples, action_logprobs), new_params
+    return (act_samples, act_logprobs), new_params
