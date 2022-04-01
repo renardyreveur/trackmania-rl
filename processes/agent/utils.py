@@ -45,7 +45,7 @@ class RaceManager:
 
     def check_state(self):
         # If vehicle is stuck
-        if abs(self.delta_distance - self.metrics['distance']) < 0.1:
+        if abs(self.delta_distance - self.metrics['distance']) < 1:
             if self.delta_counter == 0:
                 self.stuck_timer = time.time()
                 self.delta_counter += 1
@@ -55,7 +55,7 @@ class RaceManager:
         self.delta_distance = self.metrics['distance']
 
         # If vehicle stuck for more than 1500 units of continuous 'time', reset
-        if self.delta_counter > 100:
+        if self.delta_counter > 50:
             print("RESULT -- Going nowhere!\n")
             return -1
 
@@ -81,7 +81,7 @@ class RaceManager:
                    self.metrics['front_speed'],
                    int(self.metrics['checkpoint'][1:]) + 1,
                    self.metrics['duration']]
-        weights = [-0.01, 0.2, 1000, -1]
+        weights = [-0.0001, 0.002, 10, -0.01]
         reward = sum([weights[i] * metrics[i] for i in range(len(metrics))])
 
         # Race finish gives the ultimate reward
