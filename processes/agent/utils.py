@@ -79,7 +79,7 @@ class RaceManager:
         # Reward Calculation
         metrics = [self.metrics['distance'],
                    self.metrics['front_speed'],
-                   self.metrics['checkpoint'],
+                   int(self.metrics['checkpoint'][1:]) + 1,
                    self.metrics['duration']]
         weights = [-0.01, 0.2, 1000, -1]
         reward = sum([weights[i] * metrics[i] for i in range(len(metrics))])

@@ -12,7 +12,7 @@ namespace Data
     // Class that holds data structure for RL Reward calculation
     class FrameData
     {
-        int checkpoint;
+        string checkpoint;
         float front_speed;
         float distance;
         int duration;
@@ -20,11 +20,11 @@ namespace Data
 
         string EncodeJSON()
         {
-            return "{\"checkpoint\":" + checkpoint + "," +
+            return "{\"checkpoint\":" + "\"" + checkpoint + "\"" +"," +
                     "\"front_speed\":" + front_speed + "," +
                     "\"distance\":" + distance + "," +
                     "\"duration\":" + duration + "," +
-                    "\"race_finished\":" + race_finished + 
+                    "\"race_finished\":" + race_finished +
                     "}\n";
         }
 
@@ -36,7 +36,7 @@ namespace Data
         // Get Game context
         auto app = GetApp();
         CSmArenaClient@ playground = cast<CSmArenaClient>(app.CurrentPlayground);
-        
+
         // Using the Vehicle State Plugin Dependency
         auto visState = VehicleState::ViewingPlayerState();
 
@@ -60,7 +60,16 @@ namespace Data
         FrameData fd;
         if (gameTerminal.UISequence_Current == CGamePlaygroundUIConfig::EUISequence::Playing){
             playing = true;
-            fd.checkpoint = arena.Players[0].CurrentLaunchedRespawnLandmarkIndex;
+            int c_landmark_idx = arena.Players[0].CurrentLaunchedRespawnLandmarkIndex;
+            auto c_landmark = landmarks[c_landmark_idx];
+            string landmark_order;
+            if (c_landmark.Tag == "Spawn"){
+                landmark_order = "#-1";
+            }
+            else{
+                landmark_order = c_landmark.Waypoint.IdName;
+            }
+            fd.checkpoint = landmark_order;
             fd.front_speed = visState.FrontSpeed * 3.6f;
             fd.distance = player.Distance;
             fd.duration = now - player.StartTime;
