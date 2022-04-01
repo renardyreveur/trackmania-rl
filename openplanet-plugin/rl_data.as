@@ -48,7 +48,8 @@ namespace Data
         // Game artifacts
         auto gameTerminal = playground.GameTerminals[0];
         auto arena = playground.Arena;
-        auto player = cast<CSmPlayer>(arena.Players[0]).ScriptAPI;
+        // auto player = cast<CSmScriptPlayer>(cast<CSmPlayer>(gameTerminal.ControlledPlayer).ScriptAPI);
+        auto player = cast<CSmScriptPlayer>(cast<CSmPlayer>(arena.Players[0]).ScriptAPI);
         MwFastBuffer<CGameScriptMapLandmark@> landmarks = arena.MapLandmarks;
 
         // Get current in-game time (for race record and duration)
