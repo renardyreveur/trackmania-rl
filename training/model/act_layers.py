@@ -67,10 +67,8 @@ def linear(in_x, proj_dim, bias=True, seed=0, params=None):
     return in_x @ params['weight'] + (params['bias'] if bias else 0), params
 
 
-def conv2d(in_x, in_chns, out_chns, kernel_size, padding="VALID", groups=1, stride=None, bias=False,
+def conv2d(in_x, in_chns, out_chns, kernel_size, padding="VALID", groups=1, stride=(1,) * 2, bias=False,
            seed=0, params=None):
-    if stride is None:
-        stride = (1,) * (in_x.ndim - 2)
     if params is None:
         k = random.PRNGKey(seed)
         params = {}

@@ -81,13 +81,14 @@ def update_parameters(optimizer, params, gradient, op_params):
     return new_params, new_oparams
 
 
-# @jit
-def update(loss_fn, model, params: tuple, optimizer, optimizer_params: tuple, loss_kwargs):
+@partial(jit, static_argnums=(2,))
+# What if loss_fn, optimizer partial functions break tracing? Separate functions for each?
+def update(in_data, loss_fn, model, params: tuple, optimizer, optimizer_params: tuple):
     # Calculate loss
-    loss = loss_fn(params, model, **loss_kwargs)
+    loss = loss_fn(params, model, in_data)
 
     # Calculate gradients of loss w.r.t params
-    gradient = grad(loss_fn, argnums=0)(params, model, **loss_kwargs)
+    gradient = grad(loss_fn, argnums=0)(params, model, in_data)
 
     # Step counter in optimizer_params update
     update_optim_params(optimizer_params)
@@ -104,4 +105,4 @@ def update(loss_fn, model, params: tuple, optimizer, optimizer_params: tuple, lo
     if len(new_params) == 1 and isinstance(new_params[0], list):
         new_params, new_oparams = new_params[0], new_oparams[0]
 
-    return loss.item(), new_params, new_oparams
+    return loss, new_params, new_oparams

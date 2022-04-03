@@ -30,8 +30,9 @@ k = jrandom.PRNGKey(123)
 print("** Creating Q Functions ...")
 k, qs_dummy = init_params(k, size=(1, 5, 480, 320))
 k, qa_dummy = init_params(k, size=(1, 3))
-_, q1_params = q_func(qs_dummy, qa_dummy, feat_dims=Q_FEAT_DIMS)
-_, q2_params = q_func(qs_dummy, qa_dummy, feat_dims=Q_FEAT_DIMS)
+q_func = jax.tree_util.Partial(q_func, feat_dims=Q_FEAT_DIMS)  # Create partial function with static argument
+_, q1_params = q_func(qs_dummy, qa_dummy)
+_, q2_params = q_func(qs_dummy, qa_dummy)
 q_num_params = parameter_count(q1_params)
 print(f"Each Q-Value function has {q_num_params} parameters! \n")
 
@@ -42,7 +43,8 @@ q2_expmov_params = q2_params.copy()
 # Policy network
 print("** Creating Policy network ...")
 k, pi_dummy = init_params(k, size=(1, 5, 480, 320))
-_, pi_params = neural_model(pi_dummy, feat_dims=PI_FEAT_DIMS)
+neural_model = jax.tree_util.Partial(neural_model, feat_dims=PI_FEAT_DIMS)  # Create partial function with static argument
+_, pi_params = neural_model(pi_dummy)
 pi_num_params = parameter_count(pi_params)
 print(f"The Policy network has {pi_num_params} parameters!\n")
 
@@ -50,8 +52,8 @@ print(f"The Policy network has {pi_num_params} parameters!\n")
 print("** Defining Optimizers to update the networks ...")
 OPTIM = "adamw"
 lr = 0.0003
-q_optimizer = partial(getattr(optim, OPTIM), lr=lr)
-pi_optimizer = partial(getattr(optim, OPTIM), lr=lr)
+q_optimizer = jax.tree_util.Partial(getattr(optim, OPTIM), lr=lr)
+pi_optimizer = jax.tree_util.Partial(getattr(optim, OPTIM), lr=lr)
 
 q1_optimizer_params = q_optimizer(q1_params, None)
 q2_optimizer_params = q_optimizer(q2_params, None)
@@ -66,34 +68,29 @@ print(f"There are {len(dataset)} samples, and one epoch with a batch size of {20
 
 # Training loop
 print("** Start Training!\n")
+print("Please be patient, it's probably JITing sth...")
 for epoch in range(EPOCH):
     print("\n")
     start = time.time()
     for batch_idx, data in enumerate(dataloader):
         # Gradient Descent on q1 and q2
         q_loss, (q1_params, q2_params), (q1_optimizer_params, q2_optimizer_params) = optim.update(
-            jax.tree_util.Partial(soft_q_loss),
-            (jax.tree_util.Partial(neural_model), jax.tree_util.Partial(q_func)),
-            (q1_params, q2_params, pi_params, q1_expmov_params, q2_expmov_params),
-            jax.tree_util.Partial(q_optimizer),
-            (q1_optimizer_params, q2_optimizer_params),
-            loss_kwargs={
-                "feat_dims": (Q_FEAT_DIMS, PI_FEAT_DIMS),
-                "trajectory_iteration": data
-            }
+            in_data=data,
+            loss_fn=jax.tree_util.Partial(soft_q_loss),
+            model=(neural_model, q_func),
+            params=(q1_params, q2_params, pi_params, q1_expmov_params, q2_expmov_params),
+            optimizer=q_optimizer,
+            optimizer_params=(q1_optimizer_params, q2_optimizer_params),
             )
 
         # Gradient Descent on policy network
         pi_loss, pi_params, pi_optimizer_params = optim.update(
-            jax.tree_util.Partial(policy_loss),
-            (jax.tree_util.Partial(neural_model), jax.tree_util.Partial(q_func)),
-            (pi_params, q1_params, q2_params),
-            jax.tree_util.Partial(pi_optimizer),
-            (pi_optimizer_params,),
-            loss_kwargs={
-                "feat_dims": (Q_FEAT_DIMS, PI_FEAT_DIMS),
-                "trajectory_iteration": data
-            }
+            in_data=data,
+            loss_fn=jax.tree_util.Partial(policy_loss),
+            model=(neural_model, q_func),
+            params=(pi_params, q1_params, q2_params),
+            optimizer=pi_optimizer,
+            optimizer_params=(pi_optimizer_params,),
         )
 
         # Q Targets - Exponential moving average of Target Parameters update

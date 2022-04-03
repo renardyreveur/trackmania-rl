@@ -1,12 +1,8 @@
-from functools import partial
-
 import jax.numpy as jnp
-from jax import jit
 
 from .policy_model import frame_feature_extractor, get_params, linear, gelu, attention, layer_norm
 
 
-@partial(jit, static_argnums=(2,))
 def q_func(in_state, in_action, feat_dims, params=None):
     feature_seq = []
     new_params = []
