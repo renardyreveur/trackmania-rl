@@ -6,15 +6,18 @@ import jax.numpy as jnp
 
 
 class TrajectoryDataset:
-    def __init__(self, trajectory_files_root, shuffle=True):
-        # Get trajectory file names
-        traj_name = [x for x in os.listdir(trajectory_files_root) if os.path.splitext(x)[1] == ".traj"]
+    def __init__(self, trajectory_files_root, shuffle=True, online_training=False):
+        if online_training:
+            self.trajectories = trajectory_files_root
+        else:
+            # Get trajectory file names
+            traj_name = [x for x in os.listdir(trajectory_files_root) if os.path.splitext(x)[1] == ".traj"]
 
-        # Load trajectories
-        self.trajectories = []
-        for tn in traj_name:
-            with open(os.path.join(trajectory_files_root, tn), 'rb') as f:
-                self.trajectories.extend(pickle.load(f))
+            # Load trajectories
+            self.trajectories = []
+            for tn in traj_name:
+                with open(os.path.join(trajectory_files_root, tn), 'rb') as f:
+                    self.trajectories.extend(pickle.load(f))
 
         if shuffle:
             random.shuffle(self.trajectories)

@@ -1,29 +1,33 @@
-import time
+import pickle
 import queue
+import time
+from datetime import date
+from multiprocessing import Process, Pipe
 
 import vgamepad as vg
 import win32api as wapi
-import pickle
+
+from training.train import init_train, train
 
 
 class RaceManager:
-    def __init__(self, metric_que, image_que):
+    def __init__(self, metric_que, image_que, max_t_len):
         # 'Stuck' parameters
         self.delta_distance, self.delta_counter = 0, 0
+        self.start_timer, self.stuck_timer = time.time(), 0
 
         # State and Reward parameters
         self.mque, self.ique = metric_que, image_que
-
-        # Timers
-        self.start_timer, self.stuck_timer = time.time(), 0
-
-        # Observations
         self.metrics, self.frames = None, None
 
         # History
-        self.trajectory = []
-        self.num_trajectory = 0
         self.state_history, self.act_history = None, None
+        self.trajectory, self.max_trajectory_len = [], max_t_len
+
+        # Online Training
+        self.training_input = init_train()
+        self.policy_params = self.training_input[3]
+        self.runs, self.save_period = 0, 2
 
     def reset(self):
         self.delta_counter, self.delta_distance = 0, 0
@@ -44,7 +48,9 @@ class RaceManager:
             return -1, -1
 
     def check_state(self):
+        print(f"Trajectory saved: {len(self.trajectory)}")
         # If vehicle is stuck
+        print(abs(self.delta_distance - self.metrics['distance']))
         if abs(self.delta_distance - self.metrics['distance']) < 1:
             if self.delta_counter == 0:
                 self.stuck_timer = time.time()
@@ -55,6 +61,7 @@ class RaceManager:
         self.delta_distance = self.metrics['distance']
 
         # If vehicle stuck for more than 1500 units of continuous 'time', reset
+        print("COUNTER ", self.delta_counter)
         if self.delta_counter > 50:
             print("RESULT -- Going nowhere!\n")
             return -1
@@ -71,15 +78,15 @@ class RaceManager:
         self.state_history = state
         self.act_history = action
 
-    def collect_data(self, state):
+    def collect_data(self, state, gamepad):
         # Initial state
         if self.state_history is None or self.act_history is None:
-            return -1
+            return 0
 
         # Reward Calculation
         metrics = [self.metrics['distance'],
                    self.metrics['front_speed'],
-                   int(self.metrics['checkpoint'][1:]) + 1,
+                   int(self.metrics['checkpoint'][1:]) + 1 if self.metrics['checkpoint'][1:] != '' else 0,
                    self.metrics['duration']]
         weights = [-0.0001, 0.002, 10, -0.01]
         reward = sum([weights[i] * metrics[i] for i in range(len(metrics))])
@@ -88,14 +95,34 @@ class RaceManager:
         if state == -2:
             reward += 10000
 
+        # Create trajectory
         self.trajectory.append((self.state_history, self.act_history, reward, self.frames))
 
         # If a run is completed, reset replay buffer and save (as s_t and s_{t+1} won't match)
         if state != 0:
-            with open(f"training/data/t_{self.num_trajectory}.traj", 'wb') as f:
-                pickle.dump(self.trajectory, f)
-            self.trajectory = []
-            self.num_trajectory += 1
+            self.state_history, self.act_history = None, None
+
+        # Training
+        if len(self.trajectory) == self.max_trajectory_len:
+            gamepad.reset()
+            gamepad.update()
+            print("Trajectory full, pause and train!\n")
+            self.runs += 1
+            agent_conn, trainer_conn = Pipe()
+            train_process = Process(target=train, args=(self.training_input, self.trajectory, trainer_conn))
+            train_process.start()
+            self.training_input = agent_conn.recv()
+            self.policy_params = self.training_input[3]
+            train_process.join()
+            print("Done! Resuming Agent Exploration with New Policy Weights!\n")
+            self.trajectory, self.state_history, self.act_history = [], None, None
+            # Save weights to file
+            if self.runs % self.save_period == 0:
+                today = date.today()
+                with open(f'training/saved/{today.strftime("%Y%m%d")}_{self.runs}.params', 'wb') as f:
+                    pickle.dump(self.training_input, f)
+            return 1
+        return 0
 
 
 def init_game():
@@ -128,6 +155,7 @@ def reset_game(gp: vg.VDS4Gamepad, rm: RaceManager):
 
     # Release trigger
     gp.right_trigger_float(value_float=0)
+    gp.left_trigger_float(value_float=0)
     gp.update()
     time.sleep(0.3)
 

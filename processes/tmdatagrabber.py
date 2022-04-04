@@ -15,5 +15,5 @@ def start_sever(work_queue, host, port):
                         work_queue.put(result)
 
     with socketserver.TCPServer((host, port), TMDataGrabber) as server:
-        print(f"Connected to {server.server_address}")
+        print(f"Socket Server: Connected to {server.server_address}")
         server.serve_forever()
