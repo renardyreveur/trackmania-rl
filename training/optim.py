@@ -1,7 +1,8 @@
 from functools import partial
 
+import jax
 import jax.numpy as jnp
-from jax import grad, jit
+from jax import grad
 
 
 # Polyak Averaging of weights
@@ -11,29 +12,31 @@ def polyak(param1, param2, smooth_factor):
         if isinstance(p1, list):
             smoothed_param.append(polyak(p1, p2, smooth_factor))
         else:
-            smoothed_param.append({k: smooth_factor*v + (1-smooth_factor)*p2[k] for k, v in p1.items()})
+            smoothed_param.append({k: smooth_factor * v + (1 - smooth_factor) * p2[k] for k, v in p1.items()})
     return smoothed_param
 
 
 # SGD
-def sgd(w, g, lr=0.001, op_params=None, **kwargs):
+def sgd(w, g, op_params=None, lr=0.001, **kwargs):
     def init_sgd_params(params):
         params = [init_sgd_params(x) if isinstance(x, list)
                   else {k: {"step": 0} for k, v in x.items()}
                   for x in params]
         return params
+
     if op_params is None:
         return init_sgd_params(w)
     return w - lr * g, op_params
 
 
 # Adam with weight decay
-def adamw(w, g, lr=0.001, betas=(0.9, 0.999), eps=1e-08, weight_decay=0.001, op_params=None):
+def adamw(w, g, op_params=None, lr=0.001, betas=(0.9, 0.999), eps=1e-08, weight_decay=0.001):
     def init_adamw_params(params):
         params = [init_adamw_params(x) if isinstance(x, list)
                   else {k: {"m0": jnp.zeros_like(v), "v0": jnp.zeros_like(v), "step": 0} for k, v in x.items()}
                   for x in params]
         return params
+
     if op_params is None:
         return init_adamw_params(w)
         # return [{k: {"m0": 0, "v0": 0, "step": 0} for k, v in layer.items()} for layer in w]
@@ -62,6 +65,7 @@ def update_optim_params(params):
      for x in params]
 
 
+# TODO: The for loop and nested function structure here is what probably causes the long JIT compilation time
 def update_parameters(optimizer, params, gradient, op_params):
     new_params, new_oparams = [], []
     for p, g, o in zip(params, gradient, op_params):
@@ -81,7 +85,7 @@ def update_parameters(optimizer, params, gradient, op_params):
     return new_params, new_oparams
 
 
-@partial(jit, static_argnums=(2,))
+@partial(jax.jit, static_argnums=(2,))
 # What if loss_fn, optimizer partial functions break tracing? Separate functions for each?
 def update(in_data, loss_fn, model, params: tuple, optimizer, optimizer_params: tuple):
     # Calculate loss
@@ -100,6 +104,19 @@ def update(in_data, loss_fn, model, params: tuple, optimizer, optimizer_params: 
                                                 params[:num_up_params],
                                                 gradient[:num_up_params],
                                                 optimizer_params)
+    """ 
+    # Update parameters using tree_map and tree_transpose from JAX
+    # Thought this might speed up the JAX compilation, but it didn't..
+    # Still leaving it in here just in case.. 
+    updated_params = jax.tree_map(optimizer, params[:num_up_params], gradient[:num_up_params], optimizer_params)
+    new_params, new_oparams = jax.tree_util.tree_transpose(outer_treedef=jax.tree_structure(params[:num_up_params]),
+                                                           inner_treedef=jax.tree_structure(
+                                                               (0, {'m0': 0, 'v0': 0, 'step': 0})),
+                                                           pytree_to_transpose=updated_params)
+    new_oparams = jax.tree_util.tree_transpose(outer_treedef=jax.tree_structure({'m0': 0, 'v0': 0, 'step': 0}),
+                                               inner_treedef=jax.tree_structure(params[:num_up_params]),
+                                               pytree_to_transpose=new_oparams)
+    """
 
     # If input was single parameter wrapped in a tuple, reduce that tuple when returning
     if len(new_params) == 1 and isinstance(new_params[0], list):

@@ -15,7 +15,9 @@ def screen_getter(im_queue, framerate):
 
         # Capture the screen segment and put it in a queue
         x0, y0, x1, y1 = wgui.GetWindowRect(handle)
-        frame = ImageGrab.grab(bbox=(0, 32, x1-8, y1-7)).convert("RGB")
+        if x1 <= 0 or y1 <= 0:
+            continue
+        frame = ImageGrab.grab(bbox=(0, 32, x1 - 8, y1 - 7)).convert("RGB")
         np_frame = np.asarray(frame)[:, :, ::-1]
         np_frame = cv2.resize(np_frame, (480, 320))
         np_frame = np.expand_dims(cv2.cvtColor(np_frame, cv2.COLOR_BGR2GRAY), 0)
@@ -25,4 +27,4 @@ def screen_getter(im_queue, framerate):
         end = time.time()
 
         elapsed = end - start
-        time.sleep(max(1/framerate - elapsed, 0))
+        time.sleep(max(1 / framerate - elapsed, 0))

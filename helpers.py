@@ -56,3 +56,19 @@ def set_tm_window():
     wgui.MoveWindow(handle, -7, 0, swidth//2, sheight//2, True)
 
     return 0
+
+
+def remove_focus():
+    # Set focus to the Trackmania screen for input
+    handle = wgui.FindWindow(None, "Trackmania")
+    if not handle:
+        raise ValueError("Trackmania isn't on!")
+
+    # Attach Thread Process to this Python Thread
+    remote_thread, _ = wproc.GetWindowThreadProcessId(handle)
+    wproc.AttachThreadInput(wapi.GetCurrentThreadId(), remote_thread, True)
+
+    # Focus the window
+    wgui.ShowWindow(handle, 6)  # Minimize
+
+    return 0

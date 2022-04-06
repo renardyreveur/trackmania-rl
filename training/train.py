@@ -62,23 +62,22 @@ def init_train():
            pi_params, pi_optimizer_params, (q_optimizer, pi_optimizer)
 
 
-def train(train_input, trajectory_list, trainer_conn):
+def train(train_input, trajectory_list, trainer_conn, trainer_params):
     # Get parameters
     (q1_params, q2_params), (q1_expmov_params, q2_expmov_params), (q1_optimizer_params, q2_optimizer_params), \
     pi_params, pi_optimizer_params, (q_optimizer, pi_optimizer) = train_input
-    epoch = 2
     q_feat_dims, pi_feat_dims = (16, 128), (16, 64, 128)
     q_model = jax.tree_util.Partial(q_func, feat_dims=q_feat_dims)  # Create partial function with static argument
     pi_model = jax.tree_util.Partial(neural_model, feat_dims=pi_feat_dims)
 
     # Prepare dataset and data loader
     dataset = TrajectoryDataset(trajectory_list, online_training=True)
-    dataloader = TrajectoryLoader(dataset, 10)
+    dataloader = TrajectoryLoader(dataset, trainer_params['batch_size'])
     print("** Start Training!\n")
     print("Please be patient, it's probably JITing sth...")
 
     # Training loop
-    for epoch in range(epoch):
+    for epoch in range(trainer_params['epochs']):
         print("\n")
         start = time.time()
         for batch_idx, data in enumerate(dataloader):
@@ -112,8 +111,8 @@ def train(train_input, trajectory_list, trainer_conn):
         end = time.time()
         print(f"Epoch {epoch + 1} took {end - start:.2f} seconds to complete!")
 
-        # Send updated params to main process
-        trainer_conn.send(
-            ((q1_params, q2_params), (q1_expmov_params, q2_expmov_params), (q1_optimizer_params, q2_optimizer_params),
-             pi_params, pi_optimizer_params, (q_optimizer, pi_optimizer)))
-        print("Sent data back to agent process!")
+    # Send updated params to main process
+    trainer_conn.send(
+        ((q1_params, q2_params), (q1_expmov_params, q2_expmov_params), (q1_optimizer_params, q2_optimizer_params),
+         pi_params, pi_optimizer_params, (q_optimizer, pi_optimizer)))
+    print("Sent data back to agent process!")

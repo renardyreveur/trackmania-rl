@@ -5,13 +5,14 @@ from processes.agent.utils import init_game, reset_game, RaceManager
 
 
 # Controller process
-def game(met_que, img_que, max_t_len, policy_str):
+def game(met_que, img_que, max_t_len, policy_str, trainer_params):
     # Instantiate a RaceManager object
-    rm = RaceManager(met_que, img_que, max_t_len)
+    rm = RaceManager(met_que, img_que, max_t_len, trainer_params)
 
     # Let the virtual controller be recognised, wait for track selection
     gamepad = init_game()
     print("GO!\n")
+    print(f"Trajectory buffer has length: {max_t_len}")
     time.sleep(1)
     reset_game(gamepad, rm)
 

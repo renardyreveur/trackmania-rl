@@ -8,10 +8,11 @@ import vgamepad as vg
 import win32api as wapi
 
 from training.train import init_train, train
+from helpers import remove_focus, set_tm_window
 
 
 class RaceManager:
-    def __init__(self, metric_que, image_que, max_t_len):
+    def __init__(self, metric_que, image_que, max_t_len, trainer_params):
         # 'Stuck' parameters
         self.delta_distance, self.delta_counter = 0, 0
         self.start_timer, self.stuck_timer = time.time(), 0
@@ -26,6 +27,7 @@ class RaceManager:
 
         # Online Training
         self.training_input = init_train()
+        self.trainer_params = trainer_params
         self.policy_params = self.training_input[3]
         self.runs, self.save_period = 0, 2
 
@@ -48,10 +50,8 @@ class RaceManager:
             return -1, -1
 
     def check_state(self):
-        print(f"Trajectory saved: {len(self.trajectory)}")
         # If vehicle is stuck
-        print(abs(self.delta_distance - self.metrics['distance']))
-        if abs(self.delta_distance - self.metrics['distance']) < 1:
+        if abs(self.delta_distance - self.metrics['distance']) < 10 or abs(self.metrics['front_speed'] < 5):
             if self.delta_counter == 0:
                 self.stuck_timer = time.time()
                 self.delta_counter += 1
@@ -61,8 +61,7 @@ class RaceManager:
         self.delta_distance = self.metrics['distance']
 
         # If vehicle stuck for more than 1500 units of continuous 'time', reset
-        print("COUNTER ", self.delta_counter)
-        if self.delta_counter > 50:
+        if self.delta_counter > 80:
             print("RESULT -- Going nowhere!\n")
             return -1
 
@@ -88,7 +87,7 @@ class RaceManager:
                    self.metrics['front_speed'],
                    int(self.metrics['checkpoint'][1:]) + 1 if self.metrics['checkpoint'][1:] != '' else 0,
                    self.metrics['duration']]
-        weights = [-0.0001, 0.002, 10, -0.01]
+        weights = [-0.0001, 0.002, 10, -0.0001]
         reward = sum([weights[i] * metrics[i] for i in range(len(metrics))])
 
         # Race finish gives the ultimate reward
@@ -104,18 +103,31 @@ class RaceManager:
 
         # Training
         if len(self.trajectory) == self.max_trajectory_len:
+            # Reset gamepad
             gamepad.reset()
             gamepad.update()
+
+            # Minimize Trackmania to release GPU for training
+            remove_focus()
+
             print("Trajectory full, pause and train!\n")
             self.runs += 1
+
+            # Training Process
             agent_conn, trainer_conn = Pipe()
-            train_process = Process(target=train, args=(self.training_input, self.trajectory, trainer_conn))
+            train_process = Process(target=train,
+                                    args=(self.training_input, self.trajectory, trainer_conn, self.trainer_params))
             train_process.start()
             self.training_input = agent_conn.recv()
+
+            # Once we receive new policy params, open Trackmania again and try out the new brain!
+            set_tm_window()
             self.policy_params = self.training_input[3]
             train_process.join()
+
             print("Done! Resuming Agent Exploration with New Policy Weights!\n")
             self.trajectory, self.state_history, self.act_history = [], None, None
+
             # Save weights to file
             if self.runs % self.save_period == 0:
                 today = date.today()

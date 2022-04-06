@@ -12,21 +12,25 @@ tfd = tfp.distributions
 tfb = tfp.bijectors
 
 
+def abs_int_le(x):
+    return jnp.abs(jnp.ravel(x)[-1]).astype(int)
+
+
 def downsample(in_x, in_dim, out_dim, params=None):
     x, p0 = layer_norm(in_x, 1, get_params(params, 0))
     x, p1 = conv2d(x, in_dim, out_dim, kernel_size=(2, 2), stride=(2, 2),
-                   seed=abs((jnp.ravel(x)[-1]+1)*in_dim*out_dim).astype(int), params=get_params(params, 1))
+                   seed=(abs_int_le(x)+1)*in_dim*out_dim, params=get_params(params, 1))
     return x, [p0, p1]
 
 
 def convnext_block(in_x, dim, params=None):
     x, p0 = conv2d(in_x, dim, dim, kernel_size=(7, 7), padding=((3, 3), (3, 3)), groups=dim,
-                   seed=abs(((jnp.ravel(in_x)[-1]+1)*dim).astype(int)), params=get_params(params, 0))
+                   seed=(abs_int_le(in_x)+1)*dim, params=get_params(params, 0))
     x = jnp.transpose(x, (0, 2, 3, 1))
     x, p1 = layer_norm(x, 3, get_params(params, 1))
-    x, p2 = linear(x, dim * 2, seed=abs(((jnp.ravel(x)[-1]+1)*dim*2).astype(int)), params=get_params(params, 2))
+    x, p2 = linear(x, dim * 2, seed=(abs_int_le(x)+1)*dim*2, params=get_params(params, 2))
     x = gelu(x)
-    x, p3 = linear(x, dim, seed=abs(((jnp.ravel(x)[-1]+1)*dim).astype(int)), params=get_params(params, 3))
+    x, p3 = linear(x, dim, seed=(abs_int_le(x)+1)*dim, params=get_params(params, 3))
     x = jnp.transpose(x, (0, 3, 1, 2))
     # TODO: Add DropPath
     return x, [p0, p1, p2, p3]
@@ -36,7 +40,7 @@ def frame_feature_extractor(in_x, dims, params=None):
     new_params = []
     # Stem
     x, p0 = conv2d(in_x, 1, dims[0], kernel_size=(4, 4), stride=(4, 4),
-                   seed=abs(((jnp.ravel(in_x)[-1]+1)*dims[0]).astype(int)), params=get_params(params, 0))
+                   seed=(abs_int_le(in_x)+1)*dims[0], params=get_params(params, 0))
     x, p1 = layer_norm(x, 1, get_params(params, 1))
     new_params.append(p0)
     new_params.append(p1)
@@ -88,7 +92,7 @@ def neural_model(in_x, feat_dims, heads=2, deterministic=False, params=None):
     attn_heads = []
     for i in range(heads):
         a_out, p1 = attention(feature_seq, dim=feat_dims[-1],
-                              seed=abs(((jnp.ravel(feature_seq)[-1]+1)*(i+3)).astype(int)), params=get_params(params, i + 1))
+                              seed=(abs_int_le(feature_seq)+1)*(i+3), params=get_params(params, i + 1))
         attn_heads.append(a_out)
         new_params.append(p1)
 
@@ -96,7 +100,7 @@ def neural_model(in_x, feat_dims, heads=2, deterministic=False, params=None):
 
     # Residual skip-connection and layer norm
     reproj, p2 = linear(mh_out, feat_dims[-1],
-                        seed=abs(((jnp.ravel(mh_out)[-1]+1)*feat_dims[-1]).astype(int)), params=get_params(params, heads + 1))
+                        seed=(abs_int_le(mh_out)+1)*feat_dims[-1], params=get_params(params, heads + 1))
     new_params.append(p2)
     reproj = gelu(reproj + feature_seq)
     nmres, p3 = layer_norm(reproj, dim=2, params=get_params(params, heads + 2))
@@ -109,13 +113,13 @@ def neural_model(in_x, feat_dims, heads=2, deterministic=False, params=None):
     output = []
     for i, _ in enumerate(['mean', 'std']):
         mustd, p4 = linear(nmres, feat_dims[-1],
-                           seed=abs(((jnp.ravel(nmres)[-1]+1)*(i+2)).astype(int)), params=get_params(params, heads + 3 + i * 3))
+                           seed=(abs_int_le(nmres)+1)*(i+2), params=get_params(params, heads+3+i*3))
         mustd = gelu(mustd)
         mustd, p5 = linear(mustd, feat_dims[-1] // 2,
-                           seed=abs(((jnp.ravel(mustd)[-1]+1)*(i+2)).astype(int)), params=get_params(params, heads + 4 + i * 3))
+                           seed=(abs_int_le(mustd)+1)*(i+2), params=get_params(params, heads+4+i*3))
         mustd = gelu(mustd)
         mustd, p6 = linear(mustd, 3,
-                           seed=abs(((jnp.ravel(mustd)[-1]+1)*(i+2)).astype(int)), params=get_params(params, heads + 5 + i * 3))
+                           seed=(abs_int_le(mustd)+1)*(i+2), params=get_params(params, heads+5+i*3))
         output.append(mustd)
         new_params.append(p4)
         new_params.append(p5)
@@ -124,9 +128,9 @@ def neural_model(in_x, feat_dims, heads=2, deterministic=False, params=None):
     # Get action distribution, sample, and log probs using tensorflow-probability
     dist_t = [tfb.Sigmoid(), tfb.Sigmoid(), tfb.Tanh()]
     sample_seeds = [
-        abs(((jnp.ravel(output[0])[-1] + 1) * 1).astype(int)),
-        abs(((jnp.ravel(output[0])[-1] + 1) * 2).astype(int)),
-        abs(((jnp.ravel(output[0])[-1] + 1) * 3).astype(int))
+        (abs_int_le(output[0]) + 11) * 17,
+        (abs_int_le(output[0]) + 19) * 21,
+        (abs_int_le(output[0]) + 13) * 23
     ]
     act_samples, act_logprobs = batch_sample_action(output[0], jnp.exp(output[1]), dist_t, sample_seeds, deterministic)
 

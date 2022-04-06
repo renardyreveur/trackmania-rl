@@ -72,7 +72,7 @@ namespace Data
             fd.checkpoint = landmark_order;
             fd.front_speed = visState.FrontSpeed * 3.6f;
             fd.distance = player.Distance;
-            fd.duration = now - player.StartTime;
+            fd.duration = player.CurrentRaceTime;
             fd.race_finished = false;
         }
 
