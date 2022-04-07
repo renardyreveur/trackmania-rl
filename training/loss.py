@@ -56,7 +56,7 @@ def soft_q_loss(parameters, models, trajectory_iteration, decay=0.99, entropy_te
 
 
 # Policy Loss
-def policy_loss(parameters, models, trajectory_iteration, entropy_temp=0.2):
+def policy_loss(parameters, models, trajectory_iteration, entropy_temp=0.35):
     neural_model, q_func = models
     pi_p, q1_p, q2_p = parameters
 

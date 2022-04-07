@@ -77,7 +77,7 @@ batch_sample_action = vmap(sample_action, in_axes=(0, 0, None, None, None))
 
 
 @partial(jit, static_argnums=(1, 2,))
-def neural_model(in_x, feat_dims, heads=2, deterministic=False, params=None):
+def neural_model(in_x, feat_dims, heads=2, deterministic=False, params=None, seed=42):
     feature_seq = []
     new_params = []
     for frame_num in range(in_x.shape[1]):
@@ -127,11 +127,11 @@ def neural_model(in_x, feat_dims, heads=2, deterministic=False, params=None):
 
     # Get action distribution, sample, and log probs using tensorflow-probability
     dist_t = [tfb.Sigmoid(), tfb.Sigmoid(), tfb.Tanh()]
-    sample_seeds = [
-        (abs_int_le(output[0]) + 11) * 17,
-        (abs_int_le(output[0]) + 19) * 21,
-        (abs_int_le(output[0]) + 13) * 23
-    ]
+    k = jrandom.PRNGKey(seed=seed)
+    k, *keys = jrandom.split(k, num=3)
+    seed_candidates = jnp.asarray([jrandom.randint(ke, (3,), 1, 2222222) for ke in keys])
+    k, subkey = jrandom.split(k)
+    sample_seeds = jrandom.choice(subkey, seed_candidates)
     act_samples, act_logprobs = batch_sample_action(output[0], jnp.exp(output[1]), dist_t, sample_seeds, deterministic)
 
     return (act_samples, act_logprobs), new_params

@@ -2,17 +2,15 @@ import pickle
 import queue
 import time
 from datetime import date
-from multiprocessing import Process, Pipe
 
 import vgamepad as vg
 import win32api as wapi
 
-from training.train import init_train, train
 from helpers import remove_focus, set_tm_window
 
 
 class RaceManager:
-    def __init__(self, metric_que, image_que, max_t_len, trainer_params):
+    def __init__(self, metric_que, image_que, agent_conn, agent_params):
         # 'Stuck' parameters
         self.delta_distance, self.delta_counter = 0, 0
         self.start_timer, self.stuck_timer = time.time(), 0
@@ -23,12 +21,12 @@ class RaceManager:
 
         # History
         self.state_history, self.act_history = None, None
-        self.trajectory, self.max_trajectory_len = [], max_t_len
+        self.trajectory = []
 
         # Online Training
-        self.training_input = init_train()
-        self.trainer_params = trainer_params
-        self.policy_params = self.training_input[3]
+        self.agent_conn = agent_conn
+        self.agent_params = agent_params
+        self.policy_params = agent_conn.recv()
         self.runs, self.save_period = 0, 2
 
     def reset(self):
@@ -79,7 +77,7 @@ class RaceManager:
 
     def collect_data(self, state, gamepad):
         # Initial state
-        if self.state_history is None or self.act_history is None:
+        if self.state_history is None or self.act_history is None or self.metrics['duration'] < 0:
             return 0
 
         # Reward Calculation
@@ -87,8 +85,10 @@ class RaceManager:
                    self.metrics['front_speed'],
                    int(self.metrics['checkpoint'][1:]) + 1 if self.metrics['checkpoint'][1:] != '' else 0,
                    self.metrics['duration']]
-        weights = [-0.0001, 0.002, 10, -0.0001]
+        weights = [-0.001, 0.02, 10, -0.001]
         reward = sum([weights[i] * metrics[i] for i in range(len(metrics))])
+        if state == -1:
+            reward += -100
 
         # Race finish gives the ultimate reward
         if state == -2:
@@ -102,7 +102,7 @@ class RaceManager:
             self.state_history, self.act_history = None, None
 
         # Training
-        if len(self.trajectory) == self.max_trajectory_len:
+        if len(self.trajectory) == self.agent_params['trajectory_maxlen']:
             # Reset gamepad
             gamepad.reset()
             gamepad.update()
@@ -114,17 +114,11 @@ class RaceManager:
             self.runs += 1
 
             # Training Process
-            agent_conn, trainer_conn = Pipe()
-            train_process = Process(target=train,
-                                    args=(self.training_input, self.trajectory, trainer_conn, self.trainer_params))
-            train_process.start()
-            self.training_input = agent_conn.recv()
+            self.agent_conn.send(self.trajectory)
+            self.policy_params = self.agent_conn.recv()
 
             # Once we receive new policy params, open Trackmania again and try out the new brain!
             set_tm_window()
-            self.policy_params = self.training_input[3]
-            train_process.join()
-
             print("Done! Resuming Agent Exploration with New Policy Weights!\n")
             self.trajectory, self.state_history, self.act_history = [], None, None
 
@@ -132,7 +126,7 @@ class RaceManager:
             if self.runs % self.save_period == 0:
                 today = date.today()
                 with open(f'training/saved/{today.strftime("%Y%m%d")}_{self.runs}.params', 'wb') as f:
-                    pickle.dump(self.training_input, f)
+                    pickle.dump(self.policy_params, f)
             return 1
         return 0
 
@@ -158,6 +152,8 @@ def init_game():
 
 
 def reset_game(gp: vg.VDS4Gamepad, rm: RaceManager):
+    gp.reset()
+    gp.update()
     # Respawn
     gp.press_button(button=vg.DS4_BUTTONS.DS4_BUTTON_CIRCLE)
     gp.update()

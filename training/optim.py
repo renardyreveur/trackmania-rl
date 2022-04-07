@@ -104,10 +104,11 @@ def update(in_data, loss_fn, model, params: tuple, optimizer, optimizer_params: 
                                                 params[:num_up_params],
                                                 gradient[:num_up_params],
                                                 optimizer_params)
-    """ 
+
+    """
     # Update parameters using tree_map and tree_transpose from JAX
-    # Thought this might speed up the JAX compilation, but it didn't..
-    # Still leaving it in here just in case.. 
+    # Thought this might speed up the JAX compilation, but it didn't...
+    # Still leaving it in here just in case...
     updated_params = jax.tree_map(optimizer, params[:num_up_params], gradient[:num_up_params], optimizer_params)
     new_params, new_oparams = jax.tree_util.tree_transpose(outer_treedef=jax.tree_structure(params[:num_up_params]),
                                                            inner_treedef=jax.tree_structure(

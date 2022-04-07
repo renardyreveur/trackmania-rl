@@ -4,25 +4,35 @@ if os.name == 'nt':
     os.add_dll_directory("C:/Program Files/NVIDIA GPU Computing Toolkit/CUDA/v11.6/bin")
     os.add_dll_directory("C:/Program Files/NVIDIA/CUDNN/v8.3/bin")
 
-from multiprocessing import Process, Queue
+from multiprocessing import Process, Queue, Pipe
 from multiprocessing.managers import BaseManager
 
 from helpers import FrameList, set_tm_window
 from processes.agent.controller import game
 from processes.screengetter import screen_getter
 from processes.tmdatagrabber import start_sever
+from training.train import train
 
 # ===== Parameters =====
 POLICY = "neural_policy"
-TRAJECTORY_MAXLEN = 1000
 
 TM_HOST, TM_PORT = "127.0.0.1", 20222
 
-SCREENSHOT_FRAMERATE = 20
-SCREENSHOT_MAXLEN = 5
+# (H, W)
+FRAME_SIZE = (320, 480)
 
-TRAINER_PARAMS = {
-    "epochs": 5,
+SCREENSHOT_PARAMS = {
+    "framerate": 20,
+    "size": FRAME_SIZE
+}
+
+AGENT_PARAMS = {
+    "trajectory_maxlen": 500,
+    "screenshot_maxlen": 5,
+    "q_feat_dims": (16, 64),
+    "p_feat_dims": (16, 32, 64),
+    "screenshot_size": FRAME_SIZE,
+    "epochs": 10,
     "batch_size": 25
 }
 # =======================
@@ -37,13 +47,17 @@ if __name__ == "__main__":
     BaseManager.register('FrameList', FrameList)
     manager = BaseManager()
     manager.start()
-    image_queue = manager.FrameList(max_len=SCREENSHOT_MAXLEN)
+    image_queue = manager.FrameList(max_len=AGENT_PARAMS['screenshot_maxlen'])
+
+    # Pipe between agent and training
+    agent_conn, trainer_conn = Pipe()
 
     # Controller Process (Consumer), Socket Server Process (Producer), Screenshot Taking Process (Producer)
-    p1 = Process(target=game, args=(metric_queue, image_queue, TRAJECTORY_MAXLEN, POLICY, TRAINER_PARAMS))
+    p1 = Process(target=game, args=(metric_queue, image_queue, POLICY, agent_conn, AGENT_PARAMS))
     p2 = Process(target=start_sever, args=(metric_queue, TM_HOST, TM_PORT))
-    p3 = Process(target=screen_getter, args=(image_queue, SCREENSHOT_FRAMERATE))
-    processes = [p1, p2, p3]
+    p3 = Process(target=screen_getter, args=(image_queue, SCREENSHOT_PARAMS))
+    p4 = Process(target=train, args=(trainer_conn, AGENT_PARAMS))
+    processes = [p1, p2, p3, p4]
 
     # Set Trackmania window
     set_tm_window()

@@ -1,18 +1,19 @@
 import time
+import random
 
 from processes.agent import policies
 from processes.agent.utils import init_game, reset_game, RaceManager
 
 
 # Controller process
-def game(met_que, img_que, max_t_len, policy_str, trainer_params):
+def game(met_que, img_que, policy_str, agent_conn, agent_params):
     # Instantiate a RaceManager object
-    rm = RaceManager(met_que, img_que, max_t_len, trainer_params)
+    rm = RaceManager(met_que, img_que, agent_conn, agent_params)
 
     # Let the virtual controller be recognised, wait for track selection
     gamepad = init_game()
     print("GO!\n")
-    print(f"Trajectory buffer has length: {max_t_len}")
+    print(f"Trajectory buffer has length: {agent_params['trajectory_maxlen']}")
     time.sleep(1)
     reset_game(gamepad, rm)
 
@@ -25,7 +26,8 @@ def game(met_que, img_que, max_t_len, policy_str, trainer_params):
 
         # Agent Action
         policy = getattr(policies, policy_str)
-        sub_action, action = policy(frames=frames, start=rm.start_timer, params=rm.policy_params)
+        sub_action, action = policy(frames=frames, start=rm.start_timer, params=rm.policy_params,
+                                    feat_dims=agent_params['p_feat_dims'], seed=random.randint(0, 2222222))
         gamepad.right_trigger_float(value_float=sub_action['rt'])
         gamepad.left_trigger_float(value_float=sub_action['lt'])
         gamepad.left_joystick_float(x_value_float=sub_action['ls'], y_value_float=0.0)
@@ -38,6 +40,7 @@ def game(met_que, img_que, max_t_len, policy_str, trainer_params):
             continue
 
         if state in [-1, -2]:
+            time.sleep(0.3)
             reset_game(gamepad, rm)
 
         # Save 'current' state action pair for trajectory
