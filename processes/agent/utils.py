@@ -22,6 +22,7 @@ class RaceManager:
         # History
         self.state_history, self.act_history = None, None
         self.trajectory = []
+        self.position_history, self.max_pos_hist = [], 10
 
         # Online Training
         self.agent_conn = agent_conn
@@ -32,10 +33,14 @@ class RaceManager:
     def reset(self):
         self.delta_counter, self.delta_distance = 0, 0
         self.start_timer, self.stuck_timer = time.time(), 0
+        self.position_history = []
 
     def get_metrics_frames(self):
         try:
             self.metrics = self.mque.get_nowait()
+            if len(self.position_history) == 0:
+                self.position_history = [self.metrics['position']] * self.max_pos_hist
+
             if self.metrics['race_finished']:
                 return self.metrics, []
             elif self.ique.length() == self.ique.get_max_len():
@@ -48,8 +53,8 @@ class RaceManager:
             return -1, -1
 
     def check_state(self):
-        # If vehicle is stuck
-        if abs(self.delta_distance - self.metrics['distance']) < 10 or abs(self.metrics['front_speed'] < 5):
+        # If vehicle is stuck; TODO: How do I check for donuts?
+        if abs(self.metrics['front_speed']) < 5:
             if self.delta_counter == 0:
                 self.stuck_timer = time.time()
                 self.delta_counter += 1
@@ -58,7 +63,7 @@ class RaceManager:
             self.delta_counter = 0
         self.delta_distance = self.metrics['distance']
 
-        # If vehicle stuck for more than 1500 units of continuous 'time', reset
+        # If vehicle stuck for more than N units of continuous 'time', reset
         if self.delta_counter > 80:
             print("RESULT -- Going nowhere!\n")
             return -1
@@ -84,18 +89,24 @@ class RaceManager:
         metrics = [self.metrics['distance'],
                    self.metrics['front_speed'],
                    int(self.metrics['checkpoint'][1:]) + 1 if self.metrics['checkpoint'][1:] != '' else 0,
-                   self.metrics['duration']]
-        weights = [-0.001, 0.02, 10, -0.001]
+                   self.metrics['duration'],
+                   sum([(e1-e2)**2 for e1, e2 in zip(self.metrics['position'], self.position_history[0])])
+                   ]
+        weights = [-0.001, 0.02, 10, -0.001, 0.002]
         reward = sum([weights[i] * metrics[i] for i in range(len(metrics))])
+        self.position_history.append(self.metrics['position'])
+        self.position_history = self.position_history[-self.max_pos_hist:]
         if state == -1:
-            reward += -100
+            reward += -1000
 
         # Race finish gives the ultimate reward
         if state == -2:
-            reward += 10000
+            reward += 100000
 
         # Create trajectory
         self.trajectory.append((self.state_history, self.act_history, reward, self.frames))
+        if len(self.trajectory) % self.agent_params['trajectory_maxlen'] // 4 == 0:
+            print(f"Trajectory buffer {len(self.trajectory)*100/ self.agent_params['trajectory_maxlen']:.2f}% full!")
 
         # If a run is completed, reset replay buffer and save (as s_t and s_{t+1} won't match)
         if state != 0:

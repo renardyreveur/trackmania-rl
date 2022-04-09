@@ -14,7 +14,6 @@ def game(met_que, img_que, policy_str, agent_conn, agent_params):
     gamepad = init_game()
     print("GO!\n")
     print(f"Trajectory buffer has length: {agent_params['trajectory_maxlen']}")
-    time.sleep(1)
     reset_game(gamepad, rm)
 
     # Main control loop

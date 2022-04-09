@@ -14,14 +14,18 @@ namespace Data
     {
         string checkpoint;
         float front_speed;
+        float side_speed;
         float distance;
         int duration;
         bool race_finished;
+        vec3 position;
 
         string EncodeJSON()
         {
             return "{\"checkpoint\":" + "\"" + checkpoint + "\"" +"," +
                     "\"front_speed\":" + front_speed + "," +
+                    "\"side_speed\":" + side_speed + "," +
+                    "\"position\":" + "[" + position.x + "," +  position.y + "," + position.z + "]," +
                     "\"distance\":" + distance + "," +
                     "\"duration\":" + duration + "," +
                     "\"race_finished\":" + race_finished +
@@ -71,6 +75,8 @@ namespace Data
             }
             fd.checkpoint = landmark_order;
             fd.front_speed = visState.FrontSpeed * 3.6f;
+            fd.side_speed = VehicleState::GetSideSpeed(visState) * 3.6f;
+            fd.position = player.Position;
             fd.distance = player.Distance;
             fd.duration = player.CurrentRaceTime;
             fd.race_finished = false;
