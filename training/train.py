@@ -1,4 +1,5 @@
 import os
+import pickle
 import time
 
 if os.name == 'nt':
@@ -44,6 +45,19 @@ def train(trainer_conn, agent_params):
     pi_model = jax.tree_util.Partial(neural_model,
                                      feat_dims=pi_feat_dims)  # Create partial function with static argument
     _, pi_params = pi_model(pi_dummy)
+    pi_params_pretrained = None
+    if "pretrained" in agent_params.keys():
+        if not os.path.exists(agent_params['pretrained']):
+            print("Pretrained Weights path is incorrect, please check!")
+            return -1
+        with open(agent_params['pretrained'], 'rb') as f:
+            pi_params_pretrained = pickle.load(f)
+
+        if jax.tree_util.tree_structure(pi_params) != jax.tree_util.tree_structure(pi_params_pretrained):
+            print("Provided weights file doesn't match model dimensions,"
+                  " please check if the model structure has been updated!")
+
+    pi_params = pi_params if pi_params_pretrained is None else pi_params_pretrained
     pi_num_params = parameter_count(pi_params)
     print(f"The Policy network has {pi_num_params} parameters!\n")
 

@@ -105,7 +105,7 @@ class RaceManager:
 
         # Create trajectory
         self.trajectory.append((self.state_history, self.act_history, reward, self.frames))
-        if len(self.trajectory) % self.agent_params['trajectory_maxlen'] // 4 == 0:
+        if len(self.trajectory) % (self.agent_params['trajectory_maxlen'] // 4) == 0:
             print(f"Trajectory buffer {len(self.trajectory)*100/ self.agent_params['trajectory_maxlen']:.2f}% full!")
 
         # If a run is completed, reset replay buffer and save (as s_t and s_{t+1} won't match)

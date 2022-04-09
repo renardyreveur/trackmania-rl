@@ -27,6 +27,7 @@ SCREENSHOT_PARAMS = {
 }
 
 AGENT_PARAMS = {
+    "pretrained": "training/saved/20220409_66.params",
     "trajectory_maxlen": 500,
     "screenshot_maxlen": 5,
     "q_feat_dims": (16, 64),
