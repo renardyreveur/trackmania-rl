@@ -1,5 +1,6 @@
 import time
 import random
+import jax.numpy as jnp
 
 from processes.agent import policies
 from processes.agent.utils import init_game, reset_game, RaceManager
@@ -8,12 +9,22 @@ from processes.agent.utils import init_game, reset_game, RaceManager
 # Controller process
 def game(met_que, img_que, policy_str, agent_conn, agent_params):
     # Instantiate a RaceManager object
-    rm = RaceManager(met_que, img_que, agent_conn, agent_params)
+    rm = RaceManager(met_que, img_que, agent_conn, agent_params, policy_str)
+
+    # Get Policy
+    policy = getattr(policies, policy_str)
+
+    # Prime the policy (JIT)
+    print("Priming the policy...")
+    _ = policy(frames=[jnp.ones((1, 1, *agent_params['screenshot_size'])) for _ in range(agent_params['screenshot_maxlen'])],
+               start=rm.start_timer, params=rm.policy_params,
+               feat_dims=agent_params['p_feat_dims'], seed=random.randint(0, 2222222))
 
     # Let the virtual controller be recognised, wait for track selection
     gamepad = init_game()
     print("GO!\n")
     print(f"Trajectory buffer has length: {agent_params['trajectory_maxlen']}")
+    time.sleep(1)
     reset_game(gamepad, rm)
 
     # Main control loop
@@ -23,8 +34,6 @@ def game(met_que, img_que, policy_str, agent_conn, agent_params):
         if metrics == -1:
             continue
 
-        # Agent Action
-        policy = getattr(policies, policy_str)
         sub_action, action = policy(frames=frames, start=rm.start_timer, params=rm.policy_params,
                                     feat_dims=agent_params['p_feat_dims'], seed=random.randint(0, 2222222))
         gamepad.right_trigger_float(value_float=sub_action['rt'])

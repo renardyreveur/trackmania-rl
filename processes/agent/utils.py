@@ -10,7 +10,7 @@ from helpers import remove_focus, set_tm_window
 
 
 class RaceManager:
-    def __init__(self, metric_que, image_que, agent_conn, agent_params):
+    def __init__(self, metric_que, image_que, agent_conn, agent_params, policy_str):
         # 'Stuck' parameters
         self.delta_distance, self.delta_counter = 0, 0
         self.start_timer, self.stuck_timer = time.time(), 0
@@ -25,9 +25,10 @@ class RaceManager:
         self.position_history, self.max_pos_hist = [], 10
 
         # Online Training
+        self.policy_str = policy_str
         self.agent_conn = agent_conn
         self.agent_params = agent_params
-        self.policy_params = agent_conn.recv()
+        self.policy_params = agent_conn.recv() if policy_str != "rule_based_policy_test" else None
         self.runs, self.save_period = 0, 2
 
     def reset(self):
@@ -37,24 +38,34 @@ class RaceManager:
 
     def get_metrics_frames(self):
         try:
-            self.metrics = self.mque.get_nowait()
-            if len(self.position_history) == 0:
-                self.position_history = [self.metrics['position']] * self.max_pos_hist
+            # Handle metrics queue
+            if self.mque.length() == self.mque.get_max_len():
+                self.metrics = self.mque.get_frames()[0]
+                # Handle race finished
+                if self.metrics['race_finished']:
+                    return self.metrics, []
+            else:
+                raise queue.Empty
 
-            if self.metrics['race_finished']:
-                return self.metrics, []
-            elif self.ique.length() == self.ique.get_max_len():
+            # Handle screenshot queue
+            if self.ique.length() == self.ique.get_max_len():
                 self.frames = self.ique.get_frames()
             else:
                 raise queue.Empty
+
+            # Initialize position history
+            if len(self.position_history) == 0:
+                self.position_history = [self.metrics['position']] * self.max_pos_hist
+
             return self.metrics, self.frames
+
         except queue.Empty:
             time.sleep(0.02)
             return -1, -1
 
     def check_state(self):
         # If vehicle is stuck; TODO: How do I check for donuts?
-        if abs(self.metrics['front_speed']) < 5:
+        if abs(self.metrics['front_speed']) < 8:
             if self.delta_counter == 0:
                 self.stuck_timer = time.time()
                 self.delta_counter += 1
@@ -64,7 +75,7 @@ class RaceManager:
         self.delta_distance = self.metrics['distance']
 
         # If vehicle stuck for more than N units of continuous 'time', reset
-        if self.delta_counter > 80:
+        if self.delta_counter > 50:
             print("RESULT -- Going nowhere!\n")
             return -1
 
@@ -113,7 +124,8 @@ class RaceManager:
             self.state_history, self.act_history = None, None
 
         # Training
-        if len(self.trajectory) == self.agent_params['trajectory_maxlen']:
+        if len(self.trajectory) == self.agent_params['trajectory_maxlen'] \
+                and self.policy_str != "rule_based_policy_test":
             # Reset gamepad
             gamepad.reset()
             gamepad.update()
@@ -165,9 +177,12 @@ def init_game():
 def reset_game(gp: vg.VDS4Gamepad, rm: RaceManager):
     gp.reset()
     gp.update()
+    time.sleep(0.1)
+
     # Respawn
     gp.press_button(button=vg.DS4_BUTTONS.DS4_BUTTON_CIRCLE)
     gp.update()
+    time.sleep(0.1)
     gp.release_button(button=vg.DS4_BUTTONS.DS4_BUTTON_CIRCLE)
     gp.update()
     time.sleep(0.1)

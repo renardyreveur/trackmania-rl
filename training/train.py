@@ -25,7 +25,7 @@ def train(trainer_conn, agent_params):
     k = jrandom.PRNGKey(42)
 
     # Two soft Q-functions
-    print("\n---- Train Process Initializing... ----")
+    print("\n---- Training Process Initializing... ----")
     print("** Creating Q Functions ...")
     k, qs_dummy = init_params(k, size=(1, agent_params['screenshot_maxlen'], *agent_params['screenshot_size']))
     k, qa_dummy = init_params(k, size=(1, 3))
@@ -48,10 +48,12 @@ def train(trainer_conn, agent_params):
     pi_params_pretrained = None
     if "pretrained" in agent_params.keys():
         if not os.path.exists(agent_params['pretrained']):
-            print("Pretrained Weights path is incorrect, please check!")
-            return -1
-        with open(agent_params['pretrained'], 'rb') as f:
-            pi_params_pretrained = pickle.load(f)
+            print("Path to pretrained weight is incorrect, please check!")
+            print("!!!!Continuing with new weights!!!!")
+        else:
+            print("Loading Pretrained weights...")
+            with open(agent_params['pretrained'], 'rb') as f:
+                pi_params_pretrained = pickle.load(f)
 
         if jax.tree_util.tree_structure(pi_params) != jax.tree_util.tree_structure(pi_params_pretrained):
             print("Provided weights file doesn't match model dimensions,"
