@@ -45,6 +45,7 @@ def game(met_que, img_que, policy_str, agent_conn, agent_params):
         state = rm.check_state()
         ret = rm.collect_data(state, gamepad)
         if ret:
+            reset_game(gamepad, rm)
             continue
 
         if state in [-1, -2]:
