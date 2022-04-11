@@ -7,6 +7,7 @@ import vgamepad as vg
 import win32api as wapi
 
 from helpers import remove_focus, set_tm_window
+from model.act_layers import sigmoid
 
 
 class RaceManager:
@@ -100,10 +101,10 @@ class RaceManager:
         metrics = [self.metrics['distance'],
                    self.metrics['front_speed'],
                    int(self.metrics['checkpoint'][1:]) + 1 if self.metrics['checkpoint'][1:] != '' else 0,
-                   self.metrics['duration'],
-                   sum([(e1-e2)**2 for e1, e2 in zip(self.metrics['position'], self.position_history[0])])
+                   (self.metrics['duration'] / 1000) ** 2,
+                   sum([(e1 - e2) ** 2 for e1, e2 in zip(self.metrics['position'], self.position_history[0])])
                    ]
-        weights = [-0.001, 0.05, 10, -0.00005, 0.002]
+        weights = [-0.001, 0.05, 10, -0.01, 0.002]
         reward = [weights[i] * metrics[i] for i in range(len(metrics))]
         # print({
         #     "Distance": reward[0],
@@ -113,7 +114,6 @@ class RaceManager:
         #     "Position": reward[4]
         # })
         reward = sum(reward)
-        print(reward)
         self.position_history.append(self.metrics['position'])
         self.position_history = self.position_history[-self.max_pos_hist:]
         if state == -1:
@@ -124,9 +124,10 @@ class RaceManager:
             reward += 100000
 
         # Create trajectory
-        self.trajectory.append((self.state_history, self.act_history, reward, self.frames))
+        if self.policy_str != "rule_based_policy_test":
+            self.trajectory.append((self.state_history, self.act_history, reward, self.frames))
         if len(self.trajectory) % (self.agent_params['trajectory_maxlen'] // 4) == 0:
-            print(f"Trajectory buffer {len(self.trajectory)*100/ self.agent_params['trajectory_maxlen']:.2f}% full!")
+            print(f"Trajectory buffer {len(self.trajectory) * 100 / self.agent_params['trajectory_maxlen']:.2f}% full!")
 
         # If a run is completed, reset replay buffer and save (as s_t and s_{t+1} won't match)
         if state != 0:
@@ -144,9 +145,10 @@ class RaceManager:
 
             print("Trajectory full, pause and train!\n")
             self.runs += 1
+            entropy_temp = sigmoid(-(0.1 * self.runs - 1)) + 0.2
 
             # Training Process
-            self.agent_conn.send(self.trajectory)
+            self.agent_conn.send((self.trajectory, entropy_temp))
             params = self.agent_conn.recv()
             self.policy_params = params['policy_params']
 

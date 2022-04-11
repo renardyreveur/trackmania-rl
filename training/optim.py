@@ -87,12 +87,12 @@ def update_parameters(optimizer, params, gradient, op_params):
 
 @partial(jax.jit, static_argnums=(2,))
 # What if loss_fn, optimizer partial functions break tracing? Separate functions for each?
-def update(in_data, loss_fn, model, params: tuple, optimizer, optimizer_params: tuple):
+def update(in_data, loss_fn, model, params: tuple, optimizer, optimizer_params: tuple, **kwargs):
     # Calculate loss
-    loss = loss_fn(params, model, in_data)
+    loss = loss_fn(params, model, in_data, entropy_temp=kwargs['entropy_temp'])
 
     # Calculate gradients of loss w.r.t params
-    gradient = grad(loss_fn, argnums=0)(params, model, in_data)
+    gradient = grad(loss_fn, argnums=0)(params, model, in_data, entropy_temp=kwargs['entropy_temp'])
 
     # Step counter in optimizer_params update
     update_optim_params(optimizer_params)

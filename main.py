@@ -28,14 +28,14 @@ SCREENSHOT_PARAMS = {
 }
 
 AGENT_PARAMS = {
-    "pretrained": "training/saved/20220409_66.params",
-    "trajectory_maxlen": 500,
+    # "pretrained": "training/saved/20220411_116.params",
+    "trajectory_maxlen": 1000,
     "screenshot_maxlen": 5,
-    "q_feat_dims": (16, 64),
-    "p_feat_dims": (16, 32, 64),
+    "q_feat_dims": (16, 128),
+    "p_feat_dims": (16, 64, 128),
     "screenshot_size": FRAME_SIZE,
-    "epochs": 10,
-    "batch_size": 25
+    "epochs": 5,
+    "batch_size": 250
 }
 # =======================
 

@@ -62,7 +62,8 @@ def train(trainer_conn, agent_params):
             params_key = ["policy_params", "q1_params", "q2_params", "q1_target_params", "q2_target_params"]
             final_params = []
             for pa, pak in zip(params, params_key):
-                if jax.tree_util.tree_structure(pa) != jax.tree_util.tree_structure(params_pretrained[pak]):
+                if jax.tree_util.tree_structure(pa) != jax.tree_util.tree_structure(params_pretrained[pak]) or \
+                        jax.tree_map(lambda x: x.shape, pa) != jax.tree_map(lambda x: x.shape, params_pretrained[pak]):
                     print(f"Provided {pak} doesn't match model dimensions,"
                           " please check if the model structure has been updated!")
                     print("!!!!Continuing with new weights!!!!\n")
@@ -92,7 +93,7 @@ def train(trainer_conn, agent_params):
 
     while True:
         # Receive start training signal
-        trajectory_list = trainer_conn.recv()
+        trajectory_list, entropy_temp = trainer_conn.recv()
         print("Received Trajectory Buffer!")
 
         # Prepare dataset and data loader
@@ -114,6 +115,7 @@ def train(trainer_conn, agent_params):
                     params=(q1_params, q2_params, pi_params, q1_expmov_params, q2_expmov_params),
                     optimizer=q_optimizer,
                     optimizer_params=(q1_optimizer_params, q2_optimizer_params),
+                    entropy_temp=entropy_temp
                 )
 
                 # Gradient Descent on policy network
@@ -124,6 +126,7 @@ def train(trainer_conn, agent_params):
                     params=(pi_params, q1_params, q2_params),
                     optimizer=pi_optimizer,
                     optimizer_params=(pi_optimizer_params,),
+                    entropy_temp=entropy_temp
                 )
 
                 # Q Targets - Exponential moving average of Target Parameters update
