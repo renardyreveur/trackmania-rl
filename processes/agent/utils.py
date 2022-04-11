@@ -103,8 +103,17 @@ class RaceManager:
                    self.metrics['duration'],
                    sum([(e1-e2)**2 for e1, e2 in zip(self.metrics['position'], self.position_history[0])])
                    ]
-        weights = [-0.001, 0.02, 10, -0.001, 0.002]
-        reward = sum([weights[i] * metrics[i] for i in range(len(metrics))])
+        weights = [-0.001, 0.05, 10, -0.00005, 0.002]
+        reward = [weights[i] * metrics[i] for i in range(len(metrics))]
+        # print({
+        #     "Distance": reward[0],
+        #     "Speed": reward[1],
+        #     "Checkpoint": reward[2],
+        #     "Duration": reward[3],
+        #     "Position": reward[4]
+        # })
+        reward = sum(reward)
+        print(reward)
         self.position_history.append(self.metrics['position'])
         self.position_history = self.position_history[-self.max_pos_hist:]
         if state == -1:
@@ -138,7 +147,8 @@ class RaceManager:
 
             # Training Process
             self.agent_conn.send(self.trajectory)
-            self.policy_params = self.agent_conn.recv()
+            params = self.agent_conn.recv()
+            self.policy_params = params['policy_params']
 
             # Once we receive new policy params, open Trackmania again and try out the new brain!
             set_tm_window()
@@ -149,7 +159,7 @@ class RaceManager:
             if self.runs % self.save_period == 0:
                 today = date.today()
                 with open(f'training/saved/{today.strftime("%Y%m%d")}_{self.runs}.params', 'wb') as f:
-                    pickle.dump(self.policy_params, f)
+                    pickle.dump(params, f)
             return 1
         return 0
 

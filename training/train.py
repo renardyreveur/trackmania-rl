@@ -45,23 +45,31 @@ def train(trainer_conn, agent_params):
     pi_model = jax.tree_util.Partial(neural_model,
                                      feat_dims=pi_feat_dims)  # Create partial function with static argument
     _, pi_params = pi_model(pi_dummy)
-    pi_params_pretrained = None
+    pi_num_params = parameter_count(pi_params)
+    print(f"The Policy network has {pi_num_params} parameters!\n")
+
+    # Load pre-trained weights
     if "pretrained" in agent_params.keys():
         if not os.path.exists(agent_params['pretrained']):
             print("Path to pretrained weight is incorrect, please check!")
-            print("!!!!Continuing with new weights!!!!")
+            print("!!!!Continuing with new weights!!!!\n")
         else:
-            print("Loading Pretrained weights...")
+            print("Loading Pretrained weights...\n")
             with open(agent_params['pretrained'], 'rb') as f:
-                pi_params_pretrained = pickle.load(f)
+                params_pretrained = pickle.load(f)
 
-        if jax.tree_util.tree_structure(pi_params) != jax.tree_util.tree_structure(pi_params_pretrained):
-            print("Provided weights file doesn't match model dimensions,"
-                  " please check if the model structure has been updated!")
+            params = [pi_params, q1_params, q2_params, q1_expmov_params, q2_expmov_params]
+            params_key = ["policy_params", "q1_params", "q2_params", "q1_target_params", "q2_target_params"]
+            final_params = []
+            for pa, pak in zip(params, params_key):
+                if jax.tree_util.tree_structure(pa) != jax.tree_util.tree_structure(params_pretrained[pak]):
+                    print(f"Provided {pak} doesn't match model dimensions,"
+                          " please check if the model structure has been updated!")
+                    print("!!!!Continuing with new weights!!!!\n")
+                    params_pretrained[pak] = None
+                final_params.append(pa if params_pretrained[pak] is None else params_pretrained[pak])
 
-    pi_params = pi_params if pi_params_pretrained is None else pi_params_pretrained
-    pi_num_params = parameter_count(pi_params)
-    print(f"The Policy network has {pi_num_params} parameters!\n")
+            pi_params, q1_params, q2_params, q1_expmov_params, q2_expmov_params = final_params
 
     # Set Optimizer
     print("** Defining Optimizers to update the networks ...")
@@ -129,5 +137,10 @@ def train(trainer_conn, agent_params):
             print(f"Epoch {epoch + 1} took {end - start:.2f} seconds to complete!")
 
         # Send updated params to main process
-        trainer_conn.send(pi_params)
+        trainer_conn.send({
+            "policy_params": pi_params,
+            "q1_params": q1_params,
+            "q2_params": q2_params,
+            "q1_target_params": q1_expmov_params,
+            "q2_target_params": q2_expmov_params})
         print("Sent data back to agent process!")
