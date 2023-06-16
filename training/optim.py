@@ -2,7 +2,7 @@ from functools import partial
 
 import jax
 import jax.numpy as jnp
-from jax import grad
+from jax import value_and_grad
 
 
 # Polyak Averaging of weights
@@ -88,11 +88,8 @@ def update_parameters(optimizer, params, gradient, op_params):
 @partial(jax.jit, static_argnums=(2,))
 # What if loss_fn, optimizer partial functions break tracing? Separate functions for each?
 def update(in_data, loss_fn, model, params: tuple, optimizer, optimizer_params: tuple, **kwargs):
-    # Calculate loss
-    loss = loss_fn(params, model, in_data, entropy_temp=kwargs['entropy_temp'])
-
-    # Calculate gradients of loss w.r.t params
-    gradient = grad(loss_fn, argnums=0)(params, model, in_data, entropy_temp=kwargs['entropy_temp'])
+    # Calculate loss and gradients of loss w.r.t params
+    loss, gradient = value_and_grad(loss_fn, argnums=0)(params, model, in_data, entropy_temp=kwargs['entropy_temp'])
 
     # Step counter in optimizer_params update
     update_optim_params(optimizer_params)
@@ -100,12 +97,11 @@ def update(in_data, loss_fn, model, params: tuple, optimizer, optimizer_params: 
     # Updatable parameters
     # The length of the optimizer_params will determine how many from the start of the parameter list to actually update
     num_up_params = len(optimizer_params)
-    new_params, new_oparams = update_parameters(optimizer,
-                                                params[:num_up_params],
-                                                gradient[:num_up_params],
-                                                optimizer_params)
+    # new_params, new_oparams = update_parameters(optimizer,
+    #                                             params[:num_up_params],
+    #                                             gradient[:num_up_params],
+    #                                             optimizer_params)
 
-    """
     # Update parameters using tree_map and tree_transpose from JAX
     # Thought this might speed up the JAX compilation, but it didn't...
     # Still leaving it in here just in case...
@@ -117,7 +113,6 @@ def update(in_data, loss_fn, model, params: tuple, optimizer, optimizer_params: 
     new_oparams = jax.tree_util.tree_transpose(outer_treedef=jax.tree_structure({'m0': 0, 'v0': 0, 'step': 0}),
                                                inner_treedef=jax.tree_structure(params[:num_up_params]),
                                                pytree_to_transpose=new_oparams)
-    """
 
     # If input was single parameter wrapped in a tuple, reduce that tuple when returning
     if len(new_params) == 1 and isinstance(new_params[0], list):
